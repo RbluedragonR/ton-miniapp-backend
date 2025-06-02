@@ -40,7 +40,7 @@ app.get('/', (req, res) => {
 app.use('/api/earn', earnRoutes);
 app.use('/api/game', gameRoutes); // Ensure gameRoutes.js is created and gameController.js exists
 app.use('/api/task', taskRoutes); // Mount task routes
-// app.use('/api/user', userRoutes);
+ app.use('/api/user', userRoutes);
 
 app.use(notFoundHandler);
 app.use(generalErrorHandler);
