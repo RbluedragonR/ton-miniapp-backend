@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const { FRONTEND_URL } = require('./config/envConfig');
-
+const pushRoutes = require('./routes/pushRoutes'); 
 const earnRoutes = require('./routes/earnRoutes');
 const gameRoutes = require('./routes/gameRoutes'); // Assuming gameRoutes.js exists
 const taskRoutes = require('./routes/taskRoutes'); // New task routes
@@ -41,7 +41,7 @@ app.use('/api/earn', earnRoutes);
 app.use('/api/game', gameRoutes); // Ensure gameRoutes.js is created and gameController.js exists
 app.use('/api/task', taskRoutes); // Mount task routes
  app.use('/api/user', userRoutes);
-
+app.use('/api/push', pushRoutes); 
 app.use(notFoundHandler);
 app.use(generalErrorHandler);
 
