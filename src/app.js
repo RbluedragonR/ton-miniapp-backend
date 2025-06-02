@@ -1,47 +1,107 @@
-// File: ar_terminal/backend/src/app.js
+// File: ar_backend/src/app.js
 const express = require('express');
 const cors = require('cors');
-const { FRONTEND_URL } = require('./config/envConfig');
-const pushRoutes = require('./routes/pushRoutes'); 
-const earnRoutes = require('./routes/earnRoutes');
-const gameRoutes = require('./routes/gameRoutes'); // Assuming gameRoutes.js exists
-const taskRoutes = require('./routes/taskRoutes'); // New task routes
-// const userRoutes = require('./routes/userRoutes');
+const { FRONTEND_URL } = require('./config/envConfig'); // Your Vercel frontend URL
 
+// Import route handlers
+const earnRoutes = require('./routes/earnRoutes');
+const gameRoutes = require('./routes/gameRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const pushRoutes = require('./routes/pushRoutes');
+const userRoutes = require('./routes/userRoutes'); // Now correctly required
+
+// Import error handling middleware
 const { generalErrorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
 const app = express();
 
-const corsOrigin = FRONTEND_URL || '*'; 
-const corsOptions = {
-  origin: corsOrigin,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-admin-secret"], // Added x-admin-secret
-  credentials: true 
-};
+// --- Comprehensive CORS Configuration ---
+const whitelist = [];
 
-if (process.env.NODE_ENV !== 'test') {
-    console.log(`CORS Origin configured for backend: ${corsOrigin}`);
-    if (corsOrigin === '*' && process.env.NODE_ENV === 'production') {
-        console.warn("CORS_WARNING: Origin is set to '*' in production. This is insecure. Please set a specific FRONTEND_URL.");
-    } else if (!FRONTEND_URL && process.env.NODE_ENV !== 'development') {
-        console.warn("CORS_WARNING: FRONTEND_URL is not set. CORS might not work as expected in this environment.");
-    }
+// Your production frontend URL from environment variables
+if (FRONTEND_URL) {
+    whitelist.push(FRONTEND_URL);
+    console.log(`CORS: Production FRONTEND_URL (${FRONTEND_URL}) added to whitelist.`);
+} else if (process.env.NODE_ENV === 'production') {
+    console.error("CORS_CRITICAL_ERROR: FRONTEND_URL environment variable is not set in production! Your frontend will be blocked by CORS.");
 }
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); 
-app.use(express.json()); 
+// Specific known frontend URLs (e.g., your Vercel preview or specific domains)
+const knownFrontendUrls = [
+    'https://tma-frontend-gray.vercel.app' // Your specific frontend URL
+    // Add other specific URLs if needed, like custom domains
+];
+knownFrontendUrls.forEach(url => {
+    if (!whitelist.includes(url)) {
+        whitelist.push(url);
+    }
+});
 
+// Whitelist for local development
+if (process.env.NODE_ENV !== 'production') {
+    const localDevUrls = ['http://localhost:5173', 'http://127.0.0.1:5173']; // Common Vite ports
+    localDevUrls.forEach(url => {
+        if (!whitelist.includes(url)) {
+            whitelist.push(url);
+        }
+    });
+    console.log(`CORS: Local development URLs added to whitelist: ${localDevUrls.join(', ')}`);
+}
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman, server-to-server)
+    // OR if the origin is in our whitelist.
+    if (!origin || whitelist.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.error(`CORS Error: Origin ${origin} not allowed. Whitelisted: [${whitelist.join(', ')}]`);
+      callback(new Error(`Origin ${origin} not allowed by CORS policy.`));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // Added PATCH
+  allowedHeaders: [
+    "Content-Type", 
+    "Authorization", 
+    "X-Requested-With", 
+    "Accept", 
+    "Origin", 
+    "x-admin-secret", // If you use this for admin endpoints
+    // Add any other custom headers your frontend might send
+  ],
+  credentials: true, // Important for cookies or authorization headers
+  optionsSuccessStatus: 200 // For legacy browser compatibility with OPTIONS
+};
+
+console.log(`CORS: Final effective whitelist for origin check: [${whitelist.join(', ')}]`);
+
+// Use CORS middleware for all routes
+app.use(cors(corsOptions));
+
+// It's good practice to handle OPTIONS requests explicitly for all routes,
+// although `cors(corsOptions)` applied globally often handles this.
+// This ensures pre-flight requests are always handled with your CORS config.
+app.options('*', cors(corsOptions)); 
+
+// To parse JSON request bodies
+app.use(express.json({ limit: '1mb' })); // Set a reasonable payload limit
+// To parse URL-encoded request bodies
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+
+// --- API Routes ---
 app.get('/', (req, res) => {
-    res.status(200).json({ message: 'ARIX Terminal Backend API is running!' });
+    res.status(200).json({ message: 'ARIX Terminal Backend API is running smoothly!' });
 });
 
 app.use('/api/earn', earnRoutes);
-app.use('/api/game', gameRoutes); // Ensure gameRoutes.js is created and gameController.js exists
-app.use('/api/task', taskRoutes); // Mount task routes
- app.use('/api/user', userRoutes);
-app.use('/api/push', pushRoutes); 
+app.use('/api/game', gameRoutes);
+app.use('/api/task', taskRoutes);
+app.use('/api/push', pushRoutes);
+app.use('/api/user', userRoutes); // Correctly mounted user routes
+
+// --- Error Handling Middlewares ---
+// These should come AFTER all your routes
 app.use(notFoundHandler);
 app.use(generalErrorHandler);
 
