@@ -8,7 +8,4 @@ const router = express.Router();
 // GET /api/user/profile/:userWalletAddress - Get user's basic profile data
 router.get('/profile/:userWalletAddress', userController.getUserProfile);
 
-// Example for future PUT endpoint to update profile
-// router.put('/profile/:userWalletAddress', authenticate, userController.updateUserProfile);
-
 module.exports = router;
