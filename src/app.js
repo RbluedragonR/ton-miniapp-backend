@@ -15,9 +15,6 @@ const userRoutes = require('./routes/userRoutes'); // Correctly required
 // Import error handling middleware and tea
 const { generalErrorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
-// --- NEW: Telegram Bot API Library Import ---
-const TelegramBot = require('node-telegram-bot-api');
-
 const app = express();
 
 // --- Comprehensive CORS Configuration ---
@@ -83,61 +80,7 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// --- NEW: Telegram Bot Initialization and Webhook Setup ---
-// Your bot token from BotFather (MUST be in Vercel Environment Variables: TELEGRAM_BOT_TOKEN)
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-if (!TELEGRAM_BOT_TOKEN) {
-    console.error("CRITICAL ERROR: TELEGRAM_BOT_TOKEN environment variable is not set!");
-    // In a production environment, you might want to exit or disable bot features gracefully.
-    // For now, we'll log and proceed, but the bot won't function without the token.
-}
-
-// Create a bot instance (no polling here, we'll use webhooks)
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN);
-
-// NEW: Telegram Webhook Endpoint
-// This route will receive updates from Telegram when users interact with your bot.
-// The URL for this endpoint will be: YOUR_VERCEL_BACKEND_URL/telegram-webhook
-app.post('/telegram-webhook', (req, res) => {
-    // Process the incoming update from Telegram
-    // The node-telegram-bot-api library handles parsing the update
-    bot.processUpdate(req.body);
-    // Important: Always send a 200 OK response to Telegram to acknowledge receipt
-    res.sendStatus(200);
-});
-
-// NEW: /start command handler for your Telegram bot
-// This function will be called when a user sends the /start command to your bot.
-bot.onText(/\/start/, (msg) => {
-    const chatId = msg.chat.id; // Get the chat ID to send the message back to the user
-    const userName = msg.from.first_name || 'there'; // Get the user's first name, default to 'there' if not available
-
-    // The welcome message content
-    const welcomeMessage = `Hello, ${userName}! 👋\n\nWelcome to ARIX Terminal TMA! Your portal to the ARIX ecosystem.\n\nClick the button below to launch the Mini App:`;
-
-    // Options for the message, including the inline keyboard with a Web App button
-    const options = {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    {
-                        text: 'Open ARIX Terminal', // Text displayed on the button
-                        web_app: { url: 'https://tma-frontend-gray.vercel.app/' } // The URL of your Vercel frontend TMA
-                    }
-                ]
-            ]
-        }
-    };
-
-    // Send the message with the button to the user
-    bot.sendMessage(chatId, welcomeMessage, options)
-        .catch(error => {
-            // Log any errors that occur during message sending
-            console.error("Error sending /start message:", error.response ? error.response.body : error.message);
-        });
-});
-
-// --- API Routes (Your existing routes) ---
+// --- API Routes ---
 app.get('/', (req, res) => {
     // Simple health check, should always work if the server is up
     res.setHeader('Content-Type', 'application/json'); // Good practice to set content type
