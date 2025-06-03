@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+     "node-telegram-bot-api": "^0.61.0",
     "@orbs-network/ton-access": "^2.3.3",
     "@ton/crypto": "^3.2.0",
    "@ton/core": "latest",
