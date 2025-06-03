@@ -6,3 +6,5 @@ src/.DS_Store
 .idea/vcs.xml
 .idea/modules.xml
 node_modules/.DS_Store
+/.idea/
+/node_modules/
