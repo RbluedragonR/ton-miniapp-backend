@@ -1,3 +1,8 @@
 .vercel
 .DS_Store
 src/.DS_Store
+.idea/ar_backend.iml
+.idea/misc.xml
+.idea/vcs.xml
+.idea/modules.xml
+node_modules/.DS_Store
