@@ -24,9 +24,9 @@ exports.getStakingConfig = async (req, res, next) => {
                 id: p.plan_id.toString(),
                 title: p.title,
                 duration: parseInt(p.duration_days, 10),
-                usdtApr: p.fixed_usdt_apr_percent,
+                usdRewardApr: p.apr_percent_of_initial_usd_value, // Changed from usdtApr
                 arixEarlyUnstakePenaltyPercent: p.arix_early_unstake_penalty_percent,
-                minStakeArix: p.min_stake_arix,
+                minStakeUsd: p.min_stake_usd, // Changed from minStakeArix
                 referralL1InvestPercent: p.referral_l1_invest_percent,
                 referralL2InvestPercent: p.referral_l2_invest_percent,
                 referralL1RewardPercent: p.referral_l1_reward_percent_of_l1_direct_bonus,
@@ -43,6 +43,7 @@ exports.getStakingConfig = async (req, res, next) => {
 
 exports.recordUserStake = async (req, res, next) => {
     try {
+        // Frontend sends inputUsdtAmount as 'referenceUsdtValue' and calculatedArixAmount as 'arixAmount'
         const { planKey, arixAmount, userWalletAddress, transactionBoc, referenceUsdtValue, referrerWalletAddress, transactionHash, stakeUUID } = req.body;
         
         if (!planKey || !arixAmount || !userWalletAddress || !transactionBoc || !referenceUsdtValue || !transactionHash || !stakeUUID) {
@@ -54,7 +55,7 @@ exports.recordUserStake = async (req, res, next) => {
         }
         const numericReferenceUsdtValue = parseFloat(referenceUsdtValue);
          if (isNaN(numericReferenceUsdtValue) || numericReferenceUsdtValue <= 0) {
-            return res.status(400).json({ message: "Invalid reference USDT value."});
+            return res.status(400).json({ message: "Invalid reference USD value."});
         }
 
         const newStake = await earnService.createStake({
@@ -64,12 +65,12 @@ exports.recordUserStake = async (req, res, next) => {
             transactionBoc,
             transactionHash, 
             stakeUUID, // Pass the UUID from frontend
-            referenceUsdtValue: numericReferenceUsdtValue,
+            referenceUsdtValue: numericReferenceUsdtValue, // This is the USD value user staked
             referrerWalletAddress
         });
 
         res.status(201).json({ 
-            message: "ARIX Stake recorded. Awaiting on-chain confirmation. USDT rewards will accrue monthly once active.", 
+            message: "ARIX Stake recorded. Awaiting on-chain confirmation. ARIX rewards will accrue monthly once active.", // Updated message
             stake: newStake
         });
     } catch (error) {
@@ -88,9 +89,11 @@ exports.getUserStakesAndRewards = async (req, res, next) => {
             return res.status(400).json({ message: "User wallet address is required." });
         }
         const currentArxPrice = await priceService.getArxUsdtPrice();
+        // The service now returns totalClaimableArix, not totalClaimableUsdt
         const data = await earnService.findAllStakesAndRewardsByUser(userWalletAddress, currentArxPrice);
         res.status(200).json(data);
-    } catch (error) {
+    }
+     catch (error) {
         console.error("CTRL: Error in getUserStakesAndRewards:", error);
         next(error);
     }
@@ -132,16 +135,17 @@ exports.confirmArixUnstake = async (req, res, next) => {
     }
 };
 
-exports.requestUsdtWithdrawal = async (req, res, next) => {
+exports.requestArixWithdrawal = async (req, res, next) => { // Renamed from requestUsdtWithdrawal
     try {
-        const { userWalletAddress, amountUsdt } = req.body;
-        if (!userWalletAddress || !amountUsdt || parseFloat(amountUsdt) <= 0) {
-            return res.status(400).json({ message: "User wallet address and valid USDT amount are required."});
+        const { userWalletAddress, amountArix } = req.body; // Expect amount in ARIX
+        if (!userWalletAddress || !amountArix || parseFloat(amountArix) <= 0) {
+            return res.status(400).json({ message: "User wallet address and valid ARIX amount are required."});
         }
-        const withdrawalResult = await earnService.processUsdtWithdrawalRequest(userWalletAddress, parseFloat(amountUsdt));
+        // Call the service with ARIX amount
+        const withdrawalResult = await earnService.processArixWithdrawalRequest(userWalletAddress, parseFloat(amountArix));
         res.status(200).json(withdrawalResult);
     } catch (error) {
-        console.error("CTRL: Error in requestUsdtWithdrawal:", error.message);
+        console.error("CTRL: Error in requestArixWithdrawal:", error.message);
         if (error.message.includes("Minimum withdrawal") || error.message.includes("Insufficient claimable")) {
             return res.status(400).json({ message: error.message });
         }
@@ -149,17 +153,18 @@ exports.requestUsdtWithdrawal = async (req, res, next) => {
     }
 };
 
-exports.triggerMonthlyUsdtRewardCalculation = async (req, res, next) => {
+exports.triggerMonthlyArixRewardCalculation = async (req, res, next) => { // Renamed from triggerMonthlyUsdtRewardCalculation
     const adminSecret = req.headers['x-admin-secret'];
     if (process.env.CRON_SECRET && adminSecret !== process.env.CRON_SECRET) {
         return res.status(403).json({ message: "Forbidden: Invalid admin secret."});
     }
     try {
-        console.log("ADMIN: Received request to trigger monthly USDT reward calculation.");
-        await earnService.calculateAndStoreMonthlyUsdtRewards();
-        res.status(200).json({ message: "Monthly USDT reward calculation process triggered successfully." });
+        console.log("ADMIN: Received request to trigger monthly ARIX reward calculation.");
+        // Call the renamed service function
+        await earnService.calculateAndStoreMonthlyArixRewards();
+        res.status(200).json({ message: "Monthly ARIX reward calculation process triggered successfully." });
     } catch (error) {
-        console.error("CTRL: Error triggering monthly USDT reward calculation:", error);
+        console.error("CTRL: Error triggering monthly ARIX reward calculation:", error);
         next(error);
     }
 };

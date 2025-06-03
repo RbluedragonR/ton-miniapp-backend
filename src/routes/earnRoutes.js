@@ -11,7 +11,7 @@ router.get('/config', earnController.getStakingConfig);
 // POST /api/earn/stake - User initiates an ARIX stake
 router.post('/stake', earnController.recordUserStake);
 
-// GET /api/earn/stakes/:userWalletAddress - Get user's stakes and USDT reward summary
+// GET /api/earn/stakes/:userWalletAddress - Get user's stakes and ARIX reward summary
 router.get('/stakes/:userWalletAddress', earnController.getUserStakesAndRewards);
 
 // POST /api/earn/initiate-unstake - Prepare for ARIX principal unstake from SC
@@ -20,11 +20,11 @@ router.post('/initiate-arix-unstake', earnController.initiateArixUnstake);
 // POST /api/earn/confirm-unstake - Confirm ARIX principal unstake from SC
 router.post('/confirm-arix-unstake', earnController.confirmArixUnstake);
 
-// POST /api/earn/request-usdt-withdrawal - User requests to withdraw their accrued USDT rewards
-router.post('/request-usdt-withdrawal', earnController.requestUsdtWithdrawal);
+// POST /api/earn/request-arix-withdrawal - User requests to withdraw their accrued ARIX rewards (renamed)
+router.post('/request-arix-withdrawal', earnController.requestArixWithdrawal);
 
-// POST /api/earn/admin/trigger-monthly-rewards - Admin/Cron endpoint
-router.post('/admin/trigger-monthly-rewards', earnController.triggerMonthlyUsdtRewardCalculation);
+// POST /api/earn/admin/trigger-monthly-rewards - Admin/Cron endpoint (renamed)
+router.post('/admin/trigger-monthly-rewards', earnController.triggerMonthlyArixRewardCalculation);
 
 
 module.exports = router;
