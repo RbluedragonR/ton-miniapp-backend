@@ -84,7 +84,6 @@ async function getWalletForPayout(mnemonic) {
     return { contract, keyPair, address: wallet.address.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'}) };
 }
 
-
 module.exports = { 
     getTonClient, 
     getJettonWalletAddress,
