@@ -1,4 +1,4 @@
-// File: ar_backend/src/controllers/earnController.js
+
 const earnService = require('../services/earnService');
 const priceService = require('../services/priceService');
 const { Address } = require('@ton/core');

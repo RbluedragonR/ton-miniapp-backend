@@ -1,4 +1,4 @@
-// File: ar_backend/src/routes/userRoutes.js
+
 const express = require('express');
 const userController = require('../controllers/userController');
 // const { authenticate } = require('../middlewares/authMiddleware'); // Optional

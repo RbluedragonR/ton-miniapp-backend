@@ -1,4 +1,4 @@
-// File: ar_backend/src/utils/payloadParsers.js
+
 const { Address, Slice } = require('@ton/ton'); // Assuming Slice is available or Cell.beginParse() is used
 
 /**

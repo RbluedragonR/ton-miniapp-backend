@@ -1,4 +1,4 @@
-// File: ar_backend/src/services/earnService.js
+
 const db = require('../config/database');
 const { Address, toNano, fromNano, internal, Cell, Slice } = require('@ton/ton');
 const priceService = require('./priceService');
@@ -263,7 +263,7 @@ class EarnService {
         const unlockTime = new Date(stake.unlock_timestamp);
         const principalArix = parseFloat(stake.arix_amount_staked);
         let penaltyPercent = 0;
-        let messageText = ""; // Renamed from 'message' to avoid conflict
+        let messageText = ""; 
         const isEarly = now < unlockTime;
 
         if (isEarly) {
@@ -273,7 +273,7 @@ class EarnService {
             messageText = "Ready for full-term ARIX principal unstake. You will receive your ARIX principal. Accrued USDT rewards are managed separately.";
         }
         return {
-            message: messageText, // Keep 'message' for consistency with controller if it expects that
+            message: messageText, 
             stakeId: stake.stake_id,
             isEarly,
             principalArix: principalArix.toFixed(ARIX_DECIMALS),
@@ -392,13 +392,13 @@ class EarnService {
                                 continue;
                             }
 
-                            const forwardPayloadCellRef = bodySlice.loadMaybeRef(); // In internal_transfer, payload is after fwd_amount
+                            const forwardPayloadCellRef = bodySlice.loadMaybeRef(); 
                             let forwardPayloadCell = forwardPayloadCellRef;
-                            if (opCode === OP_JETTON_INTERNAL_TRANSFER) { // internal_transfer has response_destination, custom_payload, forward_ton_amount before forward_payload
-                                bodySlice.loadAddress(); // response_destination
-                                bodySlice.loadBit();     // custom_payload bit
-                                bodySlice.loadCoins();   // forward_ton_amount
-                                forwardPayloadCell = bodySlice.loadMaybeRef(); // The actual forward_payload
+                            if (opCode === OP_JETTON_INTERNAL_TRANSFER) { 
+                                bodySlice.loadAddress(); 
+                                bodySlice.loadBit();     
+                                bodySlice.loadCoins();   
+                                forwardPayloadCell = bodySlice.loadMaybeRef(); 
                             }
 
 
@@ -418,7 +418,7 @@ class EarnService {
                                 verificationNote = `Duration mismatch. Expected: ${expectedDurationSeconds}, Got: ${scPayload.durationSeconds}`;
                                 continue;
                             }
-                            // Add checks for arix_lock_apr_bps and arix_lock_penalty_bps if needed
+                            
                             const expectedPenaltyBps = parseInt(planRecord.arix_early_unstake_penalty_percent * 100);
                             if (scPayload.arixLockPenaltyBps !== expectedPenaltyBps) {
                                 verificationNote = `Penalty BPS mismatch. Expected: ${expectedPenaltyBps}, Got: ${scPayload.arixLockPenaltyBps}`;
@@ -473,8 +473,8 @@ class EarnService {
             if (stakeRecord.status !== 'pending_arix_unstake_confirmation') {
                 return { verified: true, reason: `Already processed or not in pending state (status: ${stakeRecord.status})` };
             }
-            // onchain_unstake_tx_hash is the hash of the user's transaction *calling* the main Staking Contract.
-            // We need to find the subsequent transaction where the SC's Jetton Wallet sends ARIX back to the user's Jetton Wallet.
+            
+            
 
             const tonClient = await tonUtils.getTonClient();
             const userAddr = Address.parse(stakeRecord.user_wallet_address);
@@ -499,7 +499,7 @@ class EarnService {
                         if (opCode === OP_JETTON_TRANSFER_NOTIFICATION || opCode === OP_JETTON_INTERNAL_TRANSFER) {
                             const queryId = bodySlice.loadUintBig(64);
                             finalArixReturnedByScToUser = bodySlice.loadCoins();
-                            const originalSenderOfNotification = bodySlice.loadAddressSlices(); // For notification
+                            const originalSenderOfNotification = bodySlice.loadAddressSlices(); 
 
                             let forwardPayloadCell = null;
                             if (opCode === OP_JETTON_INTERNAL_TRANSFER) {
@@ -536,7 +536,7 @@ class EarnService {
             const now = new Date();
             const unlockTime = new Date(stakeRecord.unlock_timestamp);
             const isActuallyEarly = now < unlockTime;
-            let finalDbStatus = 'unstake_failed'; // Default if not verified
+            let finalDbStatus = 'unstake_failed'; 
 
             if (verifiedReturn) {
                 finalDbStatus = isActuallyEarly ? 'early_arix_unstaked' : 'completed_arix_unstaked';
@@ -641,13 +641,13 @@ class EarnService {
         }
         console.log(`Backend's USDT Jetton Wallet for payout: ${backendUsdtJettonWalletAddress}`);
 
-        const payoutForwardPayload = tonUtils.createJettonForwardPayload(BigInt(withdrawalId), `Withdrawal ID: ${withdrawalId}`); // Use withdrawalId as queryId for payload
+        const payoutForwardPayload = tonUtils.createJettonForwardPayload(BigInt(withdrawalId), `Withdrawal ID: ${withdrawalId}`); 
 
         const transferMessageBody = tonUtils.createJettonTransferMessage(
             amountUsdtSmallestUnits,
             recipientWalletAddress,
             BACKEND_USDT_WALLET_ADDRESS,
-            toNano( (TON_TRANSACTION_FEES.JETTON_TRANSFER_FROM_WALLET / 1e9).toFixed(9) ), // Convert nanoTON to TON string for toNano
+            toNano( (TON_TRANSACTION_FEES.JETTON_TRANSFER_FROM_WALLET / 1e9).toFixed(9) ), 
             payoutForwardPayload
         );
 
@@ -681,7 +681,7 @@ class EarnService {
         if (amountUsdtToWithdraw < MIN_USDT_WITHDRAWAL_USD_VALUE) {
             throw new Error(`Minimum USDT withdrawal is $${MIN_USDT_WITHDRAWAL_USD_VALUE}.`);
         }
-        const amountUsdtSmallestUnits = toNano(amountUsdtToWithdraw.toFixed(USDT_DECIMALS)); // Ensure correct precision for toNano
+        const amountUsdtSmallestUnits = toNano(amountUsdtToWithdraw.toFixed(USDT_DECIMALS)); 
 
         const client = await db.getClient();
         try {
@@ -758,7 +758,7 @@ class EarnService {
         if (currentArxPrice && currentArxPrice > 0) {
             minArixWithdrawalAmount = MIN_USDT_WITHDRAWAL_USD_VALUE / currentArxPrice;
         } else {
-            minArixWithdrawalAmount = 10; // Fallback if price fails
+            minArixWithdrawalAmount = 10; 
             console.warn(`ARIX price not available for withdrawal check. Using fallback min: ${minArixWithdrawalAmount} ARIX.`);
         }
 
@@ -782,9 +782,9 @@ class EarnService {
             const newBalance = currentClaimableArix - amountArixToWithdraw;
             await client.query("UPDATE users SET claimable_arix_rewards = $1, updated_at = NOW() WHERE wallet_address = $2", [newBalance, userWalletAddress]);
 
-            // For now, ARIX withdrawals (from games/tasks) are logged but not auto-paid out.
-            // This would require a separate ARIX treasury wallet and payout logic similar to USDT.
-            // You can add a user_arix_withdrawals table and payout logic if needed.
+            
+            
+            
             console.log(`ARIX Reward Withdrawal recorded for ${userWalletAddress}: ${amountArixToWithdraw} ARIX. Balance updated. Payout is manual or via separate process for now.`);
 
             await client.query('COMMIT');
@@ -802,4 +802,4 @@ class EarnService {
 }
 
 const earnServiceInstance = new EarnService();
-module.exports = earnServiceInstance; // Export the instance directly
+module.exports = earnServiceInstance; 

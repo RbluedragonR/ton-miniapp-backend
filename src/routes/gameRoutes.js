@@ -1,4 +1,4 @@
-// File: AR_Proj/ar_backend/src/routes/gameRoutes.js
+
 const express = require('express');
 const gameController = require('../controllers/gameController'); 
 // const { authenticate } = require('../middlewares/authMiddleware'); // Optional: if auth is needed

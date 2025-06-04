@@ -1,4 +1,4 @@
-// File: AR_Proj/ar_backend/src/controllers/pushController.js
+
 const pushService = require('../services/pushService');
 
 exports.getAnnouncements = async (req, res, next) => {

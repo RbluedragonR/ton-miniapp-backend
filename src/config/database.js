@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 
 if (!process.env.POSTGRES_URL) {
-  if (process.env.NODE_ENV !== 'test') { // Don't warn in test environments
+  if (process.env.NODE_ENV !== 'test') { 
     console.warn("DATABASE_WARNING: POSTGRES_URL environment variable is not set. Database functionality will be unavailable.");
   }
 }
@@ -9,11 +9,11 @@ if (!process.env.POSTGRES_URL) {
 const pool = process.env.POSTGRES_URL ? new Pool({
   connectionString: process.env.POSTGRES_URL,
   ssl: {
-    rejectUnauthorized: false // Required for Vercel Postgres, Heroku, etc.
+    rejectUnauthorized: false
   }
 }) : null;
 
-// Test query function
+
 async function testDbConnection() {
   if (!pool) {
     console.log("DB: Pool is not initialized (POSTGRES_URL not set). Skipping DB connection test.");
@@ -30,10 +30,10 @@ async function testDbConnection() {
   }
 }
 
-// Call test connection on module load (optional, for immediate feedback during startup)
-// if (process.env.NODE_ENV !== 'test') {
-//   testDbConnection();
-// }
+
+
+
+
 
 module.exports = {
   query: (text, params) => {

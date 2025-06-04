@@ -1,4 +1,4 @@
-// File: ar_backend/src/controllers/referralController.js
+
 const referralService = require('../services/referralService');
 const { Address } = require('@ton/core');
 

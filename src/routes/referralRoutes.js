@@ -1,4 +1,4 @@
-// File: ar_backend/src/routes/referralRoutes.js
+
 const express = require('express');
 const referralController = require('../controllers/referralController');
 // const { authenticate } = require('../middlewares/authMiddleware'); // Optional

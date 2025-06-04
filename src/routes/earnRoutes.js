@@ -1,4 +1,4 @@
-// File: ar_backend/src/routes/earnRoutes.js
+
 const express = require('express');
 const earnController = require('../controllers/earnController');
 // const { authenticate } = require('../middlewares/authMiddleware'); // Optional

@@ -1,11 +1,11 @@
-// File: ar_backend/src/services/taskService.js
+
 const db = require('../config/database');
-const ARIX_DECIMALS = 9; // For reward formatting
+const ARIX_DECIMALS = 9; 
 
 class TaskService {
     async fetchActiveTasks(userWalletAddress = null) {
-        // Fetches all active tasks. If userWalletAddress is provided,
-        // it also includes the user's completion status for each task.
+        
+        
         let tasksQuery = `
             SELECT 
                 t.task_id, t.task_key, t.title, t.description, t.reward_arix_amount, 
@@ -25,7 +25,7 @@ class TaskService {
             }));
         }
 
-        // If userWalletAddress is provided, get their completion statuses
+        
         const userCompletionsQuery = `
             SELECT task_id, status, COUNT(*) as completions_count
             FROM user_task_completions
@@ -51,11 +51,11 @@ class TaskService {
 
             if (userCompletionInfo) {
                 if (userCompletionInfo.statuses.includes('reward_credited') || userCompletionInfo.statuses.includes('approved')) {
-                    userStatus = 'completed'; // Consider 'approved' as completed for display
+                    userStatus = 'completed'; 
                 } else if (userCompletionInfo.statuses.includes('pending_verification')) {
                     userStatus = 'pending_verification';
                 } else if (userCompletionInfo.statuses.includes('rejected')) {
-                    userStatus = 'rejected'; // User might be able to retry if logic allows
+                    userStatus = 'rejected'; 
                 }
 
                 if (!task.is_repeatable && userCompletionInfo.count > 0) {
@@ -79,14 +79,14 @@ class TaskService {
         try {
             await client.query('BEGIN');
 
-            // 1. Fetch task details
+            
             const taskRes = await client.query("SELECT * FROM tasks WHERE task_id = $1 AND is_active = TRUE", [taskId]);
             if (taskRes.rows.length === 0) {
                 throw new Error("Task not found or is not active.");
             }
             const task = taskRes.rows[0];
 
-            // 2. Check if user can complete this task (non-repeatable, max completions)
+            
             if (!task.is_repeatable) {
                 const existingCompletion = await client.query(
                     "SELECT completion_id FROM user_task_completions WHERE user_wallet_address = $1 AND task_id = $2 AND status != 'rejected'", 
@@ -105,14 +105,14 @@ class TaskService {
                 }
             }
             
-            // 3. Insert into user_task_completions
+            
             let initialStatus = 'pending_verification';
             if (task.validation_type === 'auto_approve') {
-                initialStatus = 'approved'; // Will be credited immediately below
+                initialStatus = 'approved'; 
             } else if (task.validation_type === 'link_submission' && !submissionData?.link) {
                  throw new Error("A link submission is required for this task.");
             }
-            // Add more validation for submissionData based on task.validation_type if needed
+            
 
             const completionRes = await client.query(
                 `INSERT INTO user_task_completions (user_wallet_address, task_id, status, submission_data, completed_at)
@@ -123,19 +123,19 @@ class TaskService {
             let message = `Task '${task.title}' submitted. Status: ${newCompletion.status}.`;
             let rewardCredited = false;
 
-            // 4. Handle auto-approval and reward crediting
+            
             if (newCompletion.status === 'approved' && parseFloat(task.reward_arix_amount) > 0) {
                 const rewardAmount = parseFloat(task.reward_arix_amount);
-                // Ensure user exists in users table (should be due to wallet connection, but good practice)
+                
                 await client.query("INSERT INTO users (wallet_address) VALUES ($1) ON CONFLICT (wallet_address) DO NOTHING", [userWalletAddress]);
                 
-                // Credit ARIX rewards
+                
                 await client.query(
                     `UPDATE users SET claimable_arix_rewards = COALESCE(claimable_arix_rewards, 0) + $1, updated_at = NOW() 
                      WHERE wallet_address = $2`,
                     [rewardAmount, userWalletAddress]
                 );
-                // Update completion status to 'reward_credited'
+                
                 await client.query(
                     `UPDATE user_task_completions SET status = 'reward_credited', reward_credited_at = NOW(), verified_at = NOW() 
                      WHERE completion_id = $1`,
@@ -145,12 +145,12 @@ class TaskService {
                 rewardCredited = true;
             }
             
-            // Special handling for 'FIRST_STAKE_TASK' - this is illustrative.
-            // A more robust way would be a trigger or a check after a stake is confirmed 'active'.
-            // For MVP, if a task is 'auto_approve_on_stake', it implies the frontend/user confirms they did it.
-            // The actual validation that a stake occurred is separate.
+            
+            
+            
+            
             if (task.task_key === 'FIRST_STAKE_TASK' && task.validation_type === 'auto_approve_on_stake') {
-                 // Assume it's approved by user action, reward if any
+                 
                  if (parseFloat(task.reward_arix_amount) > 0 && !rewardCredited) {
                     const rewardAmount = parseFloat(task.reward_arix_amount);
                     await client.query(`UPDATE users SET claimable_arix_rewards = COALESCE(claimable_arix_rewards, 0) + $1, updated_at = NOW() WHERE wallet_address = $2`, [rewardAmount, userWalletAddress]);

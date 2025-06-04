@@ -1,16 +1,16 @@
-// File: ar_terminal/backend/src/services/priceService.js
-const axios = require('axios');
-// We are removing this import for now to hardcode the address:
-// const { ARIX_TOKEN_MASTER_ADDRESS } = require('../config/envConfig');
 
-// HARDCODED FOR TESTING - Replace with envConfig import for production
+const axios = require('axios');
+
+
+
+
 const ARIX_TOKEN_MASTER_ADDRESS = "EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd";
 
 const STONFI_API_BASE_URL = "https://api.ston.fi/v1";
 
 class PriceService {
     async getArxUsdtPrice() {
-        // Log the address being used (it's now the hardcoded one)
+        
         console.log("[PriceService] Using ARIX_TOKEN_MASTER_ADDRESS:", ARIX_TOKEN_MASTER_ADDRESS);
 
         if (!ARIX_TOKEN_MASTER_ADDRESS || typeof ARIX_TOKEN_MASTER_ADDRESS !== 'string' || ARIX_TOKEN_MASTER_ADDRESS.trim() === "") {

@@ -1,4 +1,4 @@
-// File: AR_Proj/ar_backend/src/services/gameService.js
+
 const db = require('../config/database');
 const ARIX_DECIMALS = 9; 
 

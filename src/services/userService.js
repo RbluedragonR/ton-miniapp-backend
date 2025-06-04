@@ -1,6 +1,6 @@
-// File: ar_backend/src/services/userService.js
+
 const db = require('../config/database');
-const { USDT_DECIMALS, ARIX_DECIMALS } = require('../utils/constants'); // Assuming constants.js is created or values defined
+const { USDT_DECIMALS, ARIX_DECIMALS } = require('../utils/constants'); 
 
 class UserService {
     async fetchUserProfile(walletAddress) {
@@ -23,8 +23,8 @@ class UserService {
         const { rows } = await db.query(userQuery, [walletAddress]);
 
         if (rows.length === 0) {
-            // If user is not found, attempt to create them.
-            // This ensures that any valid wallet address hitting profile endpoint gets a record.
+            
+            
             const newUser = await this.ensureUserExists(walletAddress);
             return {
                 wallet_address: newUser.wallet_address,
@@ -32,12 +32,12 @@ class UserService {
                 telegram_id: newUser.telegram_id,
                 referral_code: newUser.referral_code,
                 referrer_wallet_address: newUser.referrer_wallet_address,
-                referrer_username: null, // No referrer username for a brand new user
+                referrer_username: null, 
                 referrer_code: null,
                 created_at: newUser.created_at,
                 claimable_usdt_balance: parseFloat(newUser.claimable_usdt_balance || 0).toFixed(USDT_DECIMALS || 6),
                 claimable_arix_rewards: parseFloat(newUser.claimable_arix_rewards || 0).toFixed(ARIX_DECIMALS || 9),
-                is_new_user: true, // Flag to indicate this profile was just created
+                is_new_user: true, 
             };
         }
         const user = rows[0];
@@ -57,26 +57,26 @@ class UserService {
     }
 
     async ensureUserExists(walletAddress, telegramId = null, username = null, referrerCodeOrAddress = null) {
-        // This can be called by controllers when a user first interacts.
-        // The ON CONFLICT clause handles cases where the user already exists.
-        // It intelligently updates telegram_id and username only if new values are provided AND current values are null.
-        // It intelligently updates referrer_wallet_address only if a new value is provided AND current value is null.
+        
+        
+        
+        
 
         let referrerWallet = null;
         if (referrerCodeOrAddress) {
-            // Check if it's a wallet address first
+            
             const directReferrer = await db.query("SELECT wallet_address FROM users WHERE wallet_address = $1", [referrerCodeOrAddress]);
             if (directReferrer.rows.length > 0) {
                 referrerWallet = directReferrer.rows[0].wallet_address;
             } else {
-                // Assume it's a referral code
+                
                 const referrerByCode = await db.query("SELECT wallet_address FROM users WHERE referral_code = $1", [referrerCodeOrAddress]);
                 if (referrerByCode.rows.length > 0) {
                     referrerWallet = referrerByCode.rows[0].wallet_address;
                 }
             }
         }
-        // Prevent self-referral
+        
         if (referrerWallet === walletAddress) {
             referrerWallet = null;
         }

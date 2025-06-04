@@ -7,7 +7,7 @@ const notFoundHandler = (req, res, next) => {
 const generalErrorHandler = (error, req, res, next) => {
     const statusCode = error.status || 500;
     console.error(`[${statusCode}] ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
-    console.error(error.stack); // Log stack trace for debugging
+    console.error(error.stack); 
 
     res.status(statusCode).json({
         error: {

@@ -1,4 +1,4 @@
-// File: ar_backend/src/services/referralService.js
+
 const db = require('../config/database');
 const { TMA_URL } = require('../config/envConfig');
 const { USDT_DECIMALS } = require('../utils/constants');

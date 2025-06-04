@@ -1,4 +1,4 @@
-// File: AR_Proj/ar_backend/src/controllers/gameController.js
+
 const gameService = require('../services/gameService'); 
 const { Address } = require('@ton/core');
 

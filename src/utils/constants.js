@@ -1,4 +1,4 @@
-// File: ar_backend/src/utils/constants.js
+
 
 const ARIX_DECIMALS = 9;
 const USDT_DECIMALS = 6; // Standard for jUSDT or most USDT variants

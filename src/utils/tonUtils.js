@@ -1,4 +1,4 @@
-// File: ar_backend/src/utils/tonUtils.js
+
 const { TonClient, Address, Cell, toNano, fromNano, internal, WalletContractV4, KeyPair, mnemonicToPrivateKey } = require("@ton/ton");
 const { getHttpEndpoint } = require("@orbs-network/ton-access");
 const { TON_NETWORK, TON_ACCESS_API_KEY } = require('../config/envConfig');

@@ -1,4 +1,4 @@
-// File: ar_backend/src/controllers/userController.js
+
 const userService = require('../services/userService');
 const { Address } = require('@ton/core');
 

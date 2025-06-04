@@ -3,10 +3,10 @@ import "@stdlib/jetton";
 import "@stdlib/math";
 import "@stdlib/int";
 
-// ------------ CONTRACT CONFIGURATION (for ARIX Lock) ------------ //
+
 const SECONDS_IN_YEAR: Int = 31536000; 
 
-// ------------ DATA STRUCTURES (for ARIX Lock) ------------ //
+
 struct StakeInfo {
     amount_staked_arix: Coins;
     start_time: Int as uint32;
@@ -18,22 +18,22 @@ struct StakeInfo {
     original_staker: Address;
 }
 
-// In forward_payload for ARIX stake when user sends Jettons to SC's Jetton Wallet
+
 struct StakeParametersFromUser { 
     query_id: Int as uint64;
-    stake_identifier: Int as uint64; // Derived from DB UUID (e.g., first 64 bits)
+    stake_identifier: Int as uint64;
     duration_seconds: Int as uint32;
     arix_lock_apr_bps: Int as uint16;
     arix_lock_penalty_bps: Int as uint16;
 }
 
-// Message sent by user directly to this StakingContract to initiate ARIX unstake
+
 struct UserUnstakeArixMessage { 
     query_id: Int as uint64;
-    stake_identifier_to_withdraw: Int as uint64; // The same identifier used at staking time
+    stake_identifier_to_withdraw: Int as uint64;
 }
 
-// Notification from this contract's ARIX Jetton Wallet
+
 struct JettonWalletArixStakeNotification {
     query_id: Int as uint64;
     amount: Coins;
@@ -41,18 +41,18 @@ struct JettonWalletArixStakeNotification {
     forward_payload: Slice; 
 }
 
-// ------------ CONTRACT STORAGE ------------ //
+
 storage StakingContract {
     owner_address: Address;
     arx_jetton_master_address: Address;
     my_arx_jetton_wallet_address: Address; 
-    total_stakes_created_counter: Int as uint64; // Optional: a general counter
+    total_stakes_created_counter: Int as uint64;
 
-    // Main storage: UserAddress -> (StakeIdentifier (from UUID) -> StakeInfo)
+
     stakes: map<Address, map<Int, StakeInfo>>; 
 }
 
-// ------------ INITIALIZATION ------------ //
+
 init(owner: Address, arx_master: Address, my_jetton_wallet: Address) {
     self.owner_address = owner;
     self.arx_jetton_master_address = arx_master;
@@ -61,7 +61,7 @@ init(owner: Address, arx_master: Address, my_jetton_wallet: Address) {
     self.stakes = emptyMap<Address, map<Int, StakeInfo>>();
 }
 
-// ------------ HELPER FUNCTIONS (MATH for ARIX Lock) ------------ //
+
 fun calculateArixLockReward(principal: Coins, apr_bps: Int, duration_seconds: Int): Coins {
     if (principal == 0 || apr_bps == 0 || duration_seconds == 0) { return 0; }
     let numerator: Int = principal * apr_bps * duration_seconds;
@@ -75,7 +75,7 @@ fun calculateArixLockPenalty(principal: Coins, penalty_bps: Int): Coins {
     return (principal * penalty_bps) / 10000;
 }
 
-// ------------ RECEIVE FUNCTIONS (MESSAGE HANDLERS) ------------ //
+
 
 receive(msg: JettonWalletArixStakeNotification) {
     require(context().sender == self.my_arx_jetton_wallet_address, "ERR:ARIX_NOTIF_NOT_FROM_OWN_JETTON_WALLET");
@@ -179,7 +179,7 @@ receive() {
     dump("StakingContract (ARIX Lock) received an unhandled message or bounce.");
 }
 
-// ------------ GET METHODS ------------ //
+
 get fun get_arix_stake_info(user: Address, stake_identifier: Int): StakeInfo? {
     let user_stakes_map: map<Int, StakeInfo>? = self.stakes.get(user);
     if (user_stakes_map == null) {

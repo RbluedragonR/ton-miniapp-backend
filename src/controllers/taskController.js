@@ -1,4 +1,4 @@
-// File: ar_backend/src/controllers/taskController.js
+
 const taskService = require('../services/taskService');
 const { Address } = require('@ton/core'); // For address validation
 
