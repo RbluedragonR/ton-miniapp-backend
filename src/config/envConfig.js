@@ -26,7 +26,7 @@ module.exports = {
     // Frontend & Bot
     FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
-    TMA_URL: process.env.TMA_URL || 'https://your-tma-frontend-url.vercel.app', // Your deployed TMA frontend URL for referral links
+    TMA_URL: process.env.FRONTEND_URL || 'https://tma-frontend-gray.vercel.app', // Your deployed TMA frontend URL for referral links
 
     // Misc
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
