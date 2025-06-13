@@ -1,12 +1,11 @@
-
 const express = require('express');
 const cors = require('cors');
 const { FRONTEND_URL, NODE_ENV, TELEGRAM_BOT_TOKEN, TMA_URL } = require('./config/envConfig');
 const TelegramBot = require('node-telegram-bot-api');
 
-
+// Service and Route Imports
 const userService = require('./services/userService');
-
+const { startCrashGameEngine } = require('./services/gameService'); // MODIFIED: Import the crash game starter
 
 const earnRoutes = require('./routes/earnRoutes');
 const gameRoutes = require('./routes/gameRoutes');
@@ -20,9 +19,10 @@ const { generalErrorHandler, notFoundHandler } = require('./middlewares/errorHan
 const app = express();
 
 
+// --- CORS Configuration ---
 const whitelist = [FRONTEND_URL, TMA_URL];
 if (NODE_ENV !== 'production') {
-    whitelist.push('http://localhost:5173', 'http://127.0.0.1:5173');
+    whitelist.push('http://localhost:5173', 'http://127.0.1:5173');
 }
 console.log(`[CORS Setup] Effective Whitelist: ${JSON.stringify(whitelist)}`);
 
@@ -47,6 +47,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 
+// --- Telegram Bot Setup ---
 let bot;
 if (TELEGRAM_BOT_TOKEN) {
     bot = new TelegramBot(TELEGRAM_BOT_TOKEN);
@@ -56,22 +57,14 @@ if (TELEGRAM_BOT_TOKEN) {
         res.sendStatus(200);
     });
 
-    
     bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
         const userId = msg.from.id; 
         const username = msg.from.username || msg.from.first_name || `User${userId}`;
         const referrerPayload = match ? match[1] : null; 
 
-        
-        
-        
-        
-
         let tmaLaunchUrl = TMA_URL;
         if (referrerPayload) {
-            
-            
             const url = new URL(TMA_URL);
             url.searchParams.append('ref', referrerPayload);
             tmaLaunchUrl = url.toString();
@@ -93,20 +86,15 @@ if (TELEGRAM_BOT_TOKEN) {
         }
     });
 
-    
-    
-    
-    
-    
-    
-    
-
 } else {
     console.error("CRITICAL ERROR: TELEGRAM_BOT_TOKEN environment variable is not set! Bot features will be disabled.");
 }
 
+// --- Background Service Initialization ---
+startCrashGameEngine(); // MODIFIED: Start the crash game loop when the application starts.
 
 
+// --- API Routes ---
 app.get('/', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ message: 'ARIX Terminal Backend API is alive and running!' });
@@ -120,6 +108,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/referral', referralRoutes); 
 
 
+// --- Error Handling ---
 app.use(notFoundHandler);
 app.use(generalErrorHandler);
 
