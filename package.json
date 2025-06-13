@@ -17,16 +17,17 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-     "node-telegram-bot-api": "^0.61.0",
     "@orbs-network/ton-access": "^2.3.3",
+    "@ton/core": "latest",
     "@ton/crypto": "^3.2.0",
-   "@ton/core": "latest",
-"@ton/ton": "latest",
+    "@ton/ton": "latest",
     "axios": "^1.6.8",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "pg": "^8.11.5"
+    "node-telegram-bot-api": "^0.61.0",
+    "pg": "^8.11.5",
+    "ws": "^8.18.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

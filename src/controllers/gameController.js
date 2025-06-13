@@ -1,5 +1,5 @@
-
-const gameService = require('../services/gameService'); 
+const { gameService } = require('../services/gameService');
+const userService = require('../services/userService');
 const { Address } = require('@ton/core');
 
 const isValidTonAddress = (addr) => {
@@ -11,6 +11,8 @@ const isValidTonAddress = (addr) => {
         return false;
     }
 };
+
+// --- Coinflip Handlers (Preserved) ---
 
 exports.handleCoinflipBet = async (req, res, next) => {
     try {
@@ -35,7 +37,6 @@ exports.handleCoinflipBet = async (req, res, next) => {
             betAmountArix: numericBetAmount,
             choice
         });
-        // gameResult now includes: userWalletAddress, betAmountArix, choice, serverCoinSide, outcome, amountDeltaArix, newClaimableArixRewards, gameId
         res.status(200).json(gameResult);
 
     } catch (error) {
@@ -59,4 +60,58 @@ exports.getCoinflipHistoryForUser = async (req, res, next) => {
     console.error("CTRL: Error in getCoinflipHistoryForUser:", error.message);
     next(error);
   }
+};
+
+// --- Crash Game Handlers (Production Ready) ---
+
+exports.getCrashState = (req, res) => {
+    const state = gameService.getCrashState();
+    res.status(200).json(state);
+};
+
+exports.getCrashHistory = async (req, res, next) => {
+    try {
+        const history = await gameService.getCrashHistory();
+        res.status(200).json(history);
+    } catch (error) {
+        console.error("CTRL: Error in getCrashHistory:", error.message);
+        next(error);
+    }
+};
+
+exports.placeCrashBet = async (req, res, next) => {
+    try {
+        const { userWalletAddress, betAmountArix } = req.body;
+        if (!isValidTonAddress(userWalletAddress)) {
+             return res.status(400).json({ message: "Invalid userWalletAddress." });
+        }
+        const numericBetAmount = parseFloat(betAmountArix);
+        if (isNaN(numericBetAmount) || numericBetAmount <= 0) {
+            return res.status(400).json({ message: "Invalid bet amount." });
+        }
+
+        const user = await userService.ensureUserExists(userWalletAddress);
+        const result = await gameService.placeCrashBet({
+            userId: user.id,
+            betAmountArix: numericBetAmount
+        });
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+exports.cashOutCrashBet = async (req, res, next) => {
+    try {
+        const { userWalletAddress } = req.body;
+        if (!isValidTonAddress(userWalletAddress)) {
+             return res.status(400).json({ message: "Invalid userWalletAddress." });
+        }
+        
+        const user = await userService.ensureUserExists(userWalletAddress);
+        const result = await gameService.cashOutCrashBet({ userId: user.id });
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
 };
