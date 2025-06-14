@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v9 - with ENV verification) ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v10 - Final Fix) ---${NC}"
 echo ""
 
 # --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
@@ -128,39 +128,42 @@ if [ ! -f "$PULLED_ENV_FILE" ]; then
 fi
 echo -e "${GREEN}✓ Successfully found pulled Vercel environment file at '${PULLED_ENV_FILE}'.${NC}"
 
-ENV_FILE=".env.railway"
-> "$ENV_FILE" # Create a clean .env file for Railway deployment
+# *** FIX: Create a proper shell script with 'export' commands for reliability ***
+ENV_SCRIPT_FILE="env.sh"
+> "$ENV_SCRIPT_FILE" # Create a clean script file
 
-echo -e "${YELLOW}Writing Vercel variables to temporary file '${ENV_FILE}'...${NC}"
-while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ -z "$line" ]] || [[ "$line" == \#* ]]; then continue; fi
-    if [[ "$line" == POSTGRES_URL* ]] || [[ "$line" == DATABASE_URL* ]]; then
-        echo -e "- Skipping old database URL: ${line%%=*}"
-    else
-        echo "$line" >> "$ENV_FILE"
+echo -e "${YELLOW}Writing Vercel variables to executable script '${ENV_SCRIPT_FILE}'...${NC}"
+while IFS='=' read -r key value || [[ -n "$key" ]]; do
+    # Skip empty lines and comments
+    if [[ -z "$key" ]] || [[ "$key" == \#* ]]; then continue; fi
+
+    # Skip old DB urls
+    if [[ "$key" == "POSTGRES_URL" ]] || [[ "$key" == "DATABASE_URL" ]] || [[ "$key" == smart_terminal* ]]; then
+        echo -e "- Skipping old var: ${key}"
+        continue
     fi
+
+    # Write a proper export command, quoting the value
+    echo "export ${key}='${value}'" >> "$ENV_SCRIPT_FILE"
 done < "$PULLED_ENV_FILE"
 echo -e "${GREEN}✓ Vercel environment variables prepared.${NC}"
 
-echo -e "${YELLOW}Adding Railway-specific variables to ${ENV_FILE}...${NC}"
-echo "DATABASE_URL=\"${RAILWAY_DB_URL}\"" >> "$ENV_FILE"
-echo "POSTGRES_URL=\"${RAILWAY_DB_URL}\"" >> "$ENV_FILE"
-echo "NODE_ENV=\"production\"" >> "$ENV_FILE"
-echo "TELEGRAM_BOT_TOKEN=\"7733811914:AAEgyald8xwMTCRsHQxdR-bu6bvvgHCUSYY\"" >> "$ENV_FILE"
-echo -e "${GREEN}✓ Temporary environment file '${ENV_FILE}' is ready.${NC}"
+echo -e "${YELLOW}Adding Railway-specific variables to ${ENV_SCRIPT_FILE}...${NC}"
+echo "export DATABASE_URL='${RAILWAY_DB_URL}'" >> "$ENV_SCRIPT_FILE"
+echo "export POSTGRES_URL='${RAILWAY_DB_URL}'" >> "$ENV_SCRIPT_FILE"
+echo "export NODE_ENV='production'" >> "$ENV_SCRIPT_FILE"
+echo "export TELEGRAM_BOT_TOKEN='7733811914:AAEgyald8xwMTCRsHQxdR-bu6bvvgHCUSYY'" >> "$ENV_SCRIPT_FILE"
+echo -e "${GREEN}✓ Executable environment script '${ENV_SCRIPT_FILE}' is ready.${NC}"
 
 # Step 6: Deploy to Railway by EXPORTING variables
 echo -e "${BLUE}[6/8] Deploying to Railway by exporting variables...${NC}"
 git add .
 git commit -m "Railway deployment: Automated configuration" --allow-empty
 
-echo -e "${YELLOW}Exporting variables to the current shell session...${NC}"
-set -a # Automatically export all variables defined from now on
-source "${ENV_FILE}"
-set +a # Stop automatically exporting
+echo -e "${YELLOW}Sourcing variables from '${ENV_SCRIPT_FILE}' to the current shell session...${NC}"
+source "./${ENV_SCRIPT_FILE}"
 echo -e "${GREEN}✓ Variables sourced to environment.${NC}"
 
-# *** NEW: Verification Step - Log the relevant variables to the terminal ***
 echo -e "${YELLOW}--- VERIFYING EXPORTED ENVIRONMENT VARIABLES ---${NC}"
 printenv | grep -E 'ARIX|BACKEND|FRONTEND|DATABASE_URL|POSTGRES_URL|TELEGRAM|NODE_ENV' || echo -e "${RED}No relevant environment variables found to verify.${NC}"
 echo -e "${YELLOW}----------------------------------------------${NC}"
@@ -194,10 +197,8 @@ pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges --clean --if-exi
 pg_dump "$NEON_DB_URL" --data-only > "$DUMP_FILE"
 
 echo -e "${YELLOW}Cleaning schema and data files for Railway compatibility...${NC}"
-# Clean the SCHEMA file
 sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$SCHEMA_FILE"
 echo -e "${GREEN}✓ Schema file cleaned.${NC}"
-# Clean the DATA file
 sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$DUMP_FILE"
 echo -e "${GREEN}✓ Data file cleaned.${NC}"
 
@@ -229,7 +230,7 @@ fi
 echo -e "${BLUE}[8/8] Organizing backups and cleanup...${NC}"
 BACKUP_DIR="./database_backups/migration_${TIMESTAMP}"
 mkdir -p "$BACKUP_DIR"
-mv "$SCHEMA_FILE" "$DUMP_FILE" "$IMPORT_SCRIPT" "$IMPORT_LOG" "$ENV_FILE" ./*.bak "$PULLED_ENV_FILE" "$BACKUP_DIR/" 2>/dev/null || true
+mv "$SCHEMA_FILE" "$DUMP_FILE" "$IMPORT_SCRIPT" "$IMPORT_LOG" "$ENV_SCRIPT_FILE" ./*.bak "$PULLED_ENV_FILE" "$BACKUP_DIR/" 2>/dev/null || true
 rm -rf .vercel # remove directory created by vercel pull
 echo -e "${GREEN}✓ Backup and log saved to: ${BACKUP_DIR}${NC}"
 cd ./database_backups 2>/dev/null && ls -t | grep "migration_" | tail -n +6 | xargs rm -rf 2>/dev/null; cd ..
