@@ -20,7 +20,7 @@ echo ""
 echo -e "${YELLOW}### PART 1: PREPARING AND DEPLOYING APPLICATION ###${NC}"
 
 # Step 1: Automated Code & Dependency Fix
-echo -e "${BLUE}[1/5] Analyzing and automatically fixing project files...${NC}"
+echo -e "${BLUE}[1/5] Automatically fixing project files...${NC}"
 
 # Automatically create a guaranteed-correct package.json file
 cat > package.json << 'EOF'
@@ -60,9 +60,63 @@ cat > package.json << 'EOF'
 EOF
 echo -e "${GREEN}Success: package.json has been rebuilt correctly.${NC}"
 
-# Automatically fix app.js using a reliable sed command for macOS
-sed -i.bak '/startCrashGameEngine/d' ./src/app.js
-echo -e "${GREEN}Success: Removed legacy game engine call from app.js.${NC}"
+# Automatically overwrite app.js with a guaranteed-correct version
+cat > ./src/app.js << 'EOF'
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
+const { FRONTEND_URL, NODE_ENV } = require('./config/envConfig');
+const userRoutes = require('./routes/userRoutes');
+const gameRoutes = require('./routes/gameRoutes');
+const earnRoutes = require('./routes/earnRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const referralRoutes = require('./routes/referralRoutes');
+const pushRoutes = require('./routes/pushRoutes');
+const { generalErrorHandler, notFoundHandler } = require('./middlewares/errorHandler');
+const app = express();
+app.use(helmet());
+const whitelist = (process.env.CORS_WHITELIST || `${FRONTEND_URL},http://localhost:5173`).split(',');
+console.log('[CORS Setup] Effective Whitelist:', whitelist);
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || whitelist.indexOf(origin) !== -1 || (origin && origin.startsWith('https://web.telegram.org'))) {
+            callback(null, true);
+        } else {
+            console.error(`CORS Error: Origin '${origin}' not allowed.`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+};
+app.use(cors(corsOptions));
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 250,
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use(limiter);
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+if (NODE_ENV === 'development') {
+    app.use(morgan('dev'));
+}
+app.get('/', (req, res) => {
+    res.json({ message: 'ARIX Terminal Backend is running!' });
+});
+app.use('/api/users', userRoutes);
+app.use('/api/game', gameRoutes);
+app.use('/api/earn', earnRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/push', pushRoutes);
+app.use(notFoundHandler);
+app.use(generalErrorHandler);
+module.exports = app;
+EOF
+echo -e "${GREEN}Success: app.js has been rebuilt correctly.${NC}"
 
 # Step 2: Set Correct Node.js Version & Install Dependencies
 echo -e "${BLUE}[2/5] Setting up environment and installing dependencies...${NC}"
@@ -97,7 +151,7 @@ fi
 # Step 4: Commit and Deploy
 echo -e "${BLUE}[4/5] Committing all fixes and deploying to Railway...${NC}"
 git add .
-git commit -m "Automated deployment: Fix code and dependencies" --allow-empty
+git commit -m "Automated deployment: Rebuild core files" --allow-empty
 echo -e "${YELLOW}Deploying application. This will wait for the build to complete and show live logs...${NC}"
 railway up
 
@@ -108,7 +162,7 @@ railway variables set NODE_ENV=production
 echo -e "${GREEN}### DEPLOYMENT SUCCESSFUL ###${NC}"
 echo ""
 
-# --- PART 2: MIGRATING DATABASE ---
+# --- PART 2: DATABASE MIGRATION ---
 
 echo -e "${YELLOW}### PART 2: MIGRATING DATA FROM NEON TO RAILWAY ###${NC}"
 
@@ -136,7 +190,7 @@ rm -f ./src/app.js.bak
 echo ""
 echo -e "${GREEN}--- FULL DEPLOYMENT AND MIGRATION COMPLETE ---${NC}"
 echo ""
-echo -e "${YELLOW}IMPORTANT: Add your other secrets (CORS_WHITELIST, etc.) in the Railway Dashboard.${NC}"
+echo -e "${YELLOW}IMPORTANT: Add your other secrets (CORS_WHITELIST, TELEGRAM_BOT_TOKEN, etc.) in the Railway Dashboard.${NC}"
 echo ""
 railway open
 
