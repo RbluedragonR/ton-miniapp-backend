@@ -17,12 +17,11 @@ console.log('[Server] WebSocket server initialized.');
 // Start the singleton Crash Game Engine and pass it the WebSocket server instance
 CrashGameEngine.start(wss);
 
-// Initialize Telegram Bot if you have one
-// initBot();
+// Initialize Telegram Bot Service
+initBot(app);
 
 server.listen(PORT, () => {
   console.log(`[Server] HTTP and WebSocket server running on port ${PORT}`);
-  console.log(`TON Network: ${process.env.TON_NETWORK || 'mainnet'}`);
 });
 
 module.exports = server;

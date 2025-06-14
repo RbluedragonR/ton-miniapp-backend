@@ -4,7 +4,6 @@ set -e
 # --- Configuration ---
 NEON_DB_URL="postgresql://neondb_owner:npg_0ngYqcX8vSQI@ep-proud-math-a4sxlwf8-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
 RAILWAY_PROJECT_NAME="ar-backend"
-MISSING_PACKAGE="@orbs-network/ton-access"
 
 # --- Colors for Output ---
 RED='\033[0;31m'
@@ -13,33 +12,21 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}--- ARIX Terminal Full Deployment & Migration Script ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Final Deployment & Migration Script ---${NC}"
 echo ""
 
 # --- PART 1: FIX & DEPLOY ---
 
 echo -e "${YELLOW}### PART 1: PREPARING AND DEPLOYING APPLICATION ###${NC}"
 
-# Step 1: Check System Dependencies
-echo -e "${BLUE}[1/5] Checking for required tools...${NC}"
-if ! command -v brew &> /dev/null; then
-    echo -e "${RED}Homebrew not found. Installing...${NC}"
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-fi
-if ! command -v railway &> /dev/null; then
-    echo -e "${RED}Railway CLI not found. Installing...${NC}"
-    brew install railway
-fi
-echo -e "${GREEN}System tools are ready.${NC}"
+# Step 1: Automated Code Fix
+echo -e "${BLUE}[1/5] Analyzing and fixing source code...${NC}"
+# This removes the crashing line from app.js
+sed -i.bak '/startCrashGameEngine/d' ./src/app.js
+echo -e "${GREEN}Removed legacy game engine call from app.js.${NC}"
 
 # Step 2: Fix Project Dependencies
-echo -e "${BLUE}[2/5] Analyzing and fixing project dependencies...${NC}"
-if ! grep -q "$MISSING_PACKAGE" package.json; then
-    echo -e "${YELLOW}Missing critical dependency '$MISSING_PACKAGE'. Installing now...${NC}"
-    npm install --save "$MISSING_PACKAGE"
-    echo -e "${GREEN}Dependency added.${NC}"
-fi
-echo -e "${YELLOW}Syncing package-lock.json to ensure a clean build...${NC}"
+echo -e "${BLUE}[2/5] Syncing project dependencies...${NC}"
 rm -f package-lock.json
 npm install
 echo -e "${GREEN}Project dependencies are now correct.${NC}"
@@ -59,10 +46,11 @@ fi
 # Step 4: Commit and Deploy
 echo -e "${BLUE}[4/5] Committing fixes and deploying to Railway...${NC}"
 git add .
-git commit -m "Automated build fix and deployment" --allow-empty
+git commit -m "Automated deployment fix" --allow-empty
 echo -e "${YELLOW}Deploying application. This will take a few minutes. Waiting for completion...${NC}"
 railway up
 
+# Step 5: Set Environment Variables
 echo -e "${BLUE}[5/5] Setting Production Environment Variables...${NC}"
 railway variables set NODE_ENV=production
 
@@ -93,6 +81,7 @@ echo -e "${GREEN}Successfully imported data into Railway.${NC}"
 
 # --- Cleanup and Final Instructions ---
 rm "$DUMP_FILE"
+rm ./src/app.js.bak
 echo ""
 echo -e "${GREEN}--- FULL DEPLOYMENT AND MIGRATION COMPLETE ---${NC}"
 echo ""
@@ -100,3 +89,4 @@ echo -e "${YELLOW}IMPORTANT: You must still add your secret environment variable
 echo -e "${YELLOW}in the Railway Dashboard under your project's 'Variables' tab.${NC}"
 echo ""
 railway open
+
