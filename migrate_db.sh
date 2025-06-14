@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v7 - Ultimate Compatibility) ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v8 - Final) ---${NC}"
 echo ""
 
 # --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
@@ -154,8 +154,6 @@ echo -e "${BLUE}[6/8] Deploying to Railway by exporting variables...${NC}"
 git add .
 git commit -m "Railway deployment: Automated configuration" --allow-empty
 
-# *** FIX: Source the .env file to export all variables to the shell environment ***
-# This is the most compatible method and does not depend on any specific CLI flags.
 echo -e "${YELLOW}Exporting variables to the current shell session...${NC}"
 set -a # Automatically export all variables defined from now on
 source "${ENV_FILE}"
@@ -186,10 +184,16 @@ IMPORT_SCRIPT="import_script_${TIMESTAMP}.sql"
 
 echo -e "${YELLOW}Exporting schema and data from Neon...${NC}"
 pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges --clean --if-exists > "$SCHEMA_FILE"
-echo -e "${YELLOW}Cleaning schema file for Railway compatibility...${NC}"
+pg_dump "$NEON_DB_URL" --data-only > "$DUMP_FILE"
+
+echo -e "${YELLOW}Cleaning schema and data files for Railway compatibility...${NC}"
+# Clean the SCHEMA file
 sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$SCHEMA_FILE"
-echo -e "${YELLOW}Exporting data from Neon...${NC}"
-pg_dump "$NEON_DB_URL" --data-only --no-owner --no-privileges --column-inserts > "$DUMP_FILE"
+echo -e "${GREEN}✓ Schema file cleaned.${NC}"
+# *** FIX: Clean the DATA file as well, as pg_dump adds these settings to both ***
+sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$DUMP_FILE"
+echo -e "${GREEN}✓ Data file cleaned.${NC}"
+
 
 echo -e "${YELLOW}Creating safe import script to handle circular dependencies...${NC}"
 cat > "$IMPORT_SCRIPT" <<EOF
