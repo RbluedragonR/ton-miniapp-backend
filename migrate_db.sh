@@ -100,4 +100,3 @@ echo -e "${YELLOW}IMPORTANT: You must still add your secret environment variable
 echo -e "${YELLOW}in the Railway Dashboard under your project's 'Variables' tab.${NC}"
 echo ""
 railway open
-
