@@ -1,239 +1,238 @@
 const crypto = require('crypto');
-const db = require('../config/database');
-const { toArixSmallestUnits, fromArixSmallestUnits } = require('../utils/tonUtils');
-const userService = require('./userService');
+const pool = require('../config/db');
 
-const GAME_TICK_RATE_MS = 100; // Update multiplier 10 times per second
-const WAITING_TIME_MS = 8000; // 8 seconds between rounds
-const CRASHED_TIME_MS = 4000; // 4 seconds to show crashed state
+// --- GAME CONFIGURATION ---
+const WAITING_TIME_MS = 8000;
+const CRASHED_TIME_MS = 5000;
+const GAME_TICK_RATE_MS = 100;
 
+/**
+ * Singleton class to manage the entire Crash game lifecycle.
+ * Ensures only one instance of the game runs on the server.
+ */
 class CrashGameEngine {
     constructor() {
-        this.wss = null;
-        this.gameState = {
-            phase: 'WAITING', // WAITING, RUNNING, CRASHED
-            multiplier: 1.00,
-            timeUntilNextRound: WAITING_TIME_MS / 1000,
-            gameId: null,
-            hashedServerSeed: null,
-            players: {}, // { [userAddress]: { betAmount, status: 'playing'|'cashed_out' } }
-            history: [],
-        };
-        this.gameLoopInterval = null;
-        this.timeout = null;
+        if (CrashGameEngine.instance) {
+            return CrashGameEngine.instance;
+        }
+
+        // --- Game State ---
+        this.phase = 'CONNECTING'; // WAITING, RUNNING, CRASHED
+        this.gameId = null;
+        this.crashPoint = 0;
+        this.startTime = null;
+        this.multiplier = 1.00;
+        
+        // --- Player & History Data ---
+        this.players = {}; // In-memory cache of current players for the round
+        this.history = []; // Cache of the last ~20 game results
+
+        // --- Provably Fair ---
+        this.serverSeed = null;
+        this.hashedServerSeed = null;
+
+        this.wss = null; // WebSocket Server instance
+        
+        CrashGameEngine.instance = this;
     }
 
     start(wss) {
+        if (this.wss) return; // Prevent multiple starts
         this.wss = wss;
-        console.log('[CrashEngine] Starting...');
-        this.loadHistory();
-        this.gameLoopInterval = setInterval(() => this.tick(), GAME_TICK_RATE_MS);
-        this.startWaitingPhase();
-
-        this.wss.on('connection', ws => {
-            ws.send(JSON.stringify({ type: 'full_state', payload: this.getPublicGameState() }));
-        });
+        console.log('[CrashEngine] Engine starting...');
+        this.loadHistory().then(() => this.startWaitingPhase());
     }
 
-    tick() {
-        if (this.gameState.phase === 'RUNNING') {
-            const newMultiplier = this.calculateNextMultiplier();
-            this.gameState.multiplier = newMultiplier;
-            if (newMultiplier >= this.crashPoint) {
-                this.crash();
-            }
-        }
-        if (this.gameState.phase === 'WAITING') {
-            this.gameState.timeUntilNextRound -= (GAME_TICK_RATE_MS / 1000);
-        }
-        this.broadcastState();
-    }
+    // --- Core Game Loop ---
 
-    startWaitingPhase() {
-        this.gameState.phase = 'WAITING';
-        this.gameState.timeUntilNextRound = WAITING_TIME_MS / 1000;
-        console.log('[CrashEngine] Phase: WAITING');
+    async startWaitingPhase() {
+        clearTimeout(this.gameLoopTimeout);
         
-        this.timeout = setTimeout(() => this.startRunningPhase(), WAITING_TIME_MS);
+        this.phase = 'WAITING';
+        this.players = {};
+        this.multiplier = 1.00;
+
+        // Generate secrets for the *next* round to be provably fair
+        this.serverSeed = crypto.randomBytes(32).toString('hex');
+        this.hashedServerSeed = crypto.createHash('sha256').update(this.serverSeed).digest('hex');
+        this.crashPoint = this._calculateCrashPoint(this.serverSeed);
+        
+        console.log(`[CrashEngine] WAITING phase. Next round will crash at: ${this.crashPoint.toFixed(2)}x`);
+
+        this.broadcastState();
+
+        this.gameLoopTimeout = setTimeout(() => {
+            this.startRunningPhase();
+        }, WAITING_TIME_MS);
     }
     
     async startRunningPhase() {
-        // 1. Generate Provably Fair data
-        const serverSeed = crypto.randomBytes(32).toString('hex');
-        this.hashedServerSeed = crypto.createHash('sha256').update(serverSeed).digest('hex');
-        this.crashPoint = this.calculateCrashPoint(serverSeed);
-        
-        this.gameState.phase = 'RUNNING';
-        this.gameState.multiplier = 1.00;
-        console.log(`[CrashEngine] Phase: RUNNING. Crashing at ${this.crashPoint.toFixed(2)}x`);
+        clearTimeout(this.gameLoopTimeout);
+        this.phase = 'RUNNING';
 
-        // 2. Store game in DB
-        const { rows } = await db.query(
-            'INSERT INTO crash_games (server_seed, hashed_server_seed, crash_multiplier, status) VALUES ($1, $2, $3, $4) RETURNING id',
-            [serverSeed, this.hashedServerSeed, this.crashPoint, 'in_progress']
-        );
-        this.gameState.gameId = rows[0].id;
-        this.gameState.hashedServerSeed = this.hashedServerSeed;
-
-        // Reset players for the new round, but carry over bets placed during waiting phase
-        Object.values(this.gameState.players).forEach(p => p.status = 'playing');
-    }
-
-    crash() {
-        console.log(`[CrashEngine] CRASHED at ${this.gameState.multiplier.toFixed(2)}x`);
-        this.gameState.phase = 'CRASHED';
-        this.gameState.multiplier = this.crashPoint; // Display the exact crash point
-
-        // Update game in DB
-        db.query(
-            'UPDATE crash_games SET status = $1, ended_at = NOW() WHERE id = $2',
-            ['completed', this.gameState.gameId]
-        );
-        
-        // Mark all remaining players as lost
-        Object.keys(this.gameState.players).forEach(userAddress => {
-            if (this.gameState.players[userAddress].status === 'playing') {
-                this.gameState.players[userAddress].status = 'lost';
-            }
-        });
-
-        const historyItem = { id: this.gameState.gameId, crash_multiplier: this.crashPoint };
-        this.gameState.history.unshift(historyItem);
-        if (this.gameState.history.length > 20) this.gameState.history.pop();
-
-        this.timeout = setTimeout(() => {
-            this.gameState.players = {}; // Clear players for next round
-            this.startWaitingPhase();
-        }, CRASHED_TIME_MS);
-    }
-
-    async placeBet(userAddress, betAmount) {
-        if (this.gameState.phase !== 'WAITING') {
-            throw new Error("Bets can only be placed during the 'WAITING' phase.");
-        }
-        if (this.gameState.players[userAddress]) {
-            throw new Error("You have already placed a bet for this round.");
-        }
-
-        const client = await db.getClient();
+        // Save the new round to the database
         try {
-            await client.query('BEGIN');
-            const userData = await userService.ensureUserExists(userAddress, client);
-            const betAmountSmallest = toArixSmallestUnits(betAmount);
+            const { rows } = await pool.query(
+                "INSERT INTO crash_rounds (crash_multiplier, server_seed, public_hash, hashed_server_seed, status) VALUES ($1, $2, 'not_revealed_yet', $3, 'running') RETURNING id",
+                [this.crashPoint, this.serverSeed, this.hashedServerSeed]
+            );
+            this.gameId = rows[0].id;
+        } catch (err) {
+            console.error('[CrashEngine] CRITICAL: Could not create game round in DB.', err);
+            this.startWaitingPhase(); // Reset if DB fails
+            return;
+        }
 
-            if (BigInt(userData.claimable_arix_rewards) < betAmountSmallest) {
-                throw new Error('Insufficient ARIX balance.');
-            }
+        console.log(`[CrashEngine] RUNNING phase. Game ID: ${this.gameId}`);
+        this.startTime = Date.now();
+        this.tick();
+    }
+    
+    tick() {
+        if (this.phase !== 'RUNNING') return;
+        
+        const elapsed = (Date.now() - this.startTime) / 1000;
+        this.multiplier = Math.pow(1.04, elapsed); // Adjusted curve for a smoother start
 
-            const newBalance = BigInt(userData.claimable_arix_rewards) - betAmountSmallest;
-            await client.query(
-                'UPDATE users SET claimable_arix_rewards = $1 WHERE id = $2',
-                [newBalance.toString(), userData.id]
+        if (this.multiplier >= this.crashPoint) {
+            this.endGame();
+        } else {
+            this.broadcastState();
+            this.gameLoopTimeout = setTimeout(() => this.tick(), GAME_TICK_RATE_MS);
+        }
+    }
+    
+    async endGame() {
+        clearTimeout(this.gameLoopTimeout);
+        this.phase = 'CRASHED';
+        this.multiplier = this.crashPoint;
+
+        console.log(`[CrashEngine] CRASHED at ${this.crashPoint.toFixed(2)}x`);
+
+        await pool.query("UPDATE crash_rounds SET status = 'crashed' WHERE id = $1", [this.gameId]);
+
+        // Mark any players who didn't cash out as 'lost'
+        Object.values(this.players).forEach(p => {
+            if (p.status === 'placed') p.status = 'lost';
+        });
+        await pool.query(
+            "UPDATE crash_bets SET status = 'lost' WHERE game_id = $1 AND status = 'placed'", 
+            [this.gameId]
+        );
+
+        this.history.push({ crash_multiplier: this.crashPoint.toFixed(2) });
+        if(this.history.length > 20) this.history.shift();
+
+        this.broadcastState();
+        
+        this.gameLoopTimeout = setTimeout(() => this.startWaitingPhase(), CRASHED_TIME_MS);
+    }
+    
+    // --- Player Actions (called from websocket server) ---
+
+    async handlePlaceBet(userWalletAddress, betAmountArix) {
+        if (this.phase !== 'WAITING') return { success: false, message: "Bets are closed for this round." };
+        if (this.players[userWalletAddress]) return { success: false, message: "You already placed a bet." };
+        if (!userWalletAddress || isNaN(betAmountArix) || betAmountArix <= 0) return { success: false, message: "Invalid bet." };
+
+        // 1. Debit ARIX balance
+        try {
+            const result = await pool.query(
+                `UPDATE users 
+                 SET claimable_arix_rewards = claimable_arix_rewards - $1 
+                 WHERE wallet_address = $2 AND claimable_arix_rewards >= $1
+                 RETURNING claimable_arix_rewards`,
+                [betAmountArix, userWalletAddress]
             );
 
-            // We don't have gameId yet, so we'll add it later when game starts
-            // Or better, we let the user bet and store it when the game starts.
-            // For now, simple in-memory:
-            this.gameState.players[userAddress] = {
-                betAmount,
-                status: 'waiting_for_start' 
-            };
-            
-            await client.query('COMMIT');
-            return { success: true, newBalance: fromArixSmallestUnits(newBalance) };
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            console.error("[CrashEngine] Error placing bet:", error);
-            throw error;
-        } finally {
-            client.release();
+            if (result.rowCount === 0) {
+                return { success: false, message: 'Insufficient ARIX balance.' };
+            }
+        } catch (e) {
+            console.error(`[CrashEngine] DB Error debiting user ${userWalletAddress}`, e);
+            return { success: false, message: 'Server error placing bet.' };
         }
+
+        // 2. Add player to current round
+        this.players[userWalletAddress] = { betAmount: betAmountArix, status: 'placed' };
+        this.broadcastState();
+
+        return { success: true, message: 'Bet placed!' };
     }
 
-    async cashOut(userAddress) {
-        if (this.gameState.phase !== 'RUNNING') {
-            throw new Error('Can only cash out while the game is running.');
+    async handleCashOut(userWalletAddress) {
+        if (this.phase !== 'RUNNING') return { success: false, message: 'Not a running game.' };
+        
+        const player = this.players[userWalletAddress];
+        if (!player || player.status !== 'placed') {
+            return { success: false, message: 'No active bet to cash out.' };
         }
-        const player = this.gameState.players[userAddress];
-        if (!player || player.status !== 'playing') {
-            throw new Error('No active bet to cash out.');
-        }
+        
+        const cashOutMultiplier = this.multiplier;
+        const payoutArix = parseFloat((player.betAmount * cashOutMultiplier).toFixed(9));
 
-        const cashoutMultiplier = this.gameState.multiplier;
-        const betAmountSmallest = toArixSmallestUnits(player.betAmount);
-        const payoutAmountSmallest = BigInt(Math.floor(Number(betAmountSmallest) * cashoutMultiplier));
-
-        const client = await db.getClient();
+        // 1. Credit player wallet
         try {
-            await client.query('BEGIN');
-            
-            const { rows } = await client.query('UPDATE users SET claimable_arix_rewards = claimable_arix_rewards + $1 WHERE wallet_address = $2 RETURNING id, claimable_arix_rewards', [payoutAmountSmallest.toString(), userAddress]);
-            const newBalance = rows[0].claimable_arix_rewards;
-            const userId = rows[0].id;
-            
-            // This needs to be stored against a bet record in the DB
-            // For now, we update the in-memory state
-            player.status = 'cashed_out';
-            player.cashoutMultiplier = cashoutMultiplier;
-            player.payout = fromArixSmallestUnits(payoutAmountSmallest);
-
-            // Here you would insert/update the `crash_bets` table
-            // For simplicity, this step is omitted in this example, but it's crucial for production.
-
-            await client.query('COMMIT');
-            return { success: true, newBalance: fromArixSmallestUnits(newBalance), cashedOutAt: cashoutMultiplier };
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
+            await pool.query(
+                "UPDATE users SET claimable_arix_rewards = claimable_arix_rewards + $1 WHERE wallet_address = $2",
+                [payoutArix, userWalletAddress]
+            );
+        } catch(e) {
+             console.error(`[CrashEngine] DB Error crediting user ${userWalletAddress}`, e);
+            return { success: false, message: 'Server error processing cash out.' };
         }
-    }
-    
-    // --- Provably Fair Calculation ---
-    calculateCrashPoint(serverSeed) {
-        const hash = crypto.createHmac('sha256', serverSeed).update('provably-fair-salt').digest('hex');
-        const h = parseInt(hash.slice(0, 13), 16);
-        const e = Math.pow(2, 52);
-        const crashPoint = Math.floor((100 * e - h) / (e - h)) / 100;
-        return Math.max(1.00, crashPoint);
-    }
-    
-    // --- Multiplier Calculation ---
-    calculateNextMultiplier() {
-        const elapsed = (Date.now() - this.startTime) / 1000;
-        const multiplier = Math.pow(1.05, elapsed); // Example growth curve
-        return Math.min(multiplier, 10000); // Cap multiplier
-    }
 
-    getPublicGameState() {
+        // 2. Log the successful bet
+        await pool.query(
+            "INSERT INTO crash_bets (game_id, user_wallet_address, bet_amount_arix, status, cash_out_multiplier, payout_arix) VALUES ($1, $2, $3, 'cashed_out', $4, $5)",
+            [this.gameId, userWalletAddress, player.betAmount, cashOutMultiplier, payoutArix]
+        );
+
+        // 3. Update player state for the current round
+        player.status = 'cashed_out';
+        player.payout = payoutArix.toFixed(2);
+        player.cashOutAt = cashOutMultiplier.toFixed(2);
+
+        this.broadcastState();
+
+        return { success: true, message: 'Cashed out!', cashOutMultiplier, payoutArix };
+    }
+    
+    // --- Getters ---
+    
+    getGameState() {
         return {
-            phase: this.gameState.phase,
-            multiplier: this.gameState.multiplier,
-            timeUntilNextRound: this.gameState.timeUntilNextRound,
-            gameId: this.gameState.gameId,
-            hashedServerSeed: this.gameState.hashedServerSeed,
-            players: Object.keys(this.gameState.players).length, // Just send player count
-            history: this.gameState.history,
+            phase: this.phase,
+            multiplier: this.phase === 'CRASHED' ? this.crashPoint : this.multiplier,
+            crashPoint: this.crashPoint, // Only for final state
+            history: this.history,
+            players: Object.entries(this.players).map(([address, data]) => ({
+                user: `${address.slice(0, 4)}...${address.slice(-4)}`,
+                bet: data.betAmount,
+                status: data.status,
+                payout: data.payout,
+                cashOutAt: data.cashOutAt,
+            })),
+            timeUntilNextRound: this.gameState.timeUntilNextRound, // for countdown bar
+            hashedServerSeed: this.hashedServerSeed
         };
     }
-
-    broadcastState() {
-        if (!this.wss) return;
-        this.wss.clients.forEach(client => {
-            if (client.readyState === 1) { // WebSocket.OPEN
-                client.send(JSON.stringify({ type: 'game_update', payload: this.getPublicGameState() }));
-            }
-        });
-    }
-
+    
     async loadHistory() {
-        const { rows } = await db.query('SELECT id, crash_multiplier FROM crash_games WHERE status = $1 ORDER BY created_at DESC LIMIT 20', ['completed']);
-        this.gameState.history = rows;
+        const { rows } = await pool.query('SELECT crash_multiplier FROM crash_rounds WHERE status = $1 ORDER BY id DESC LIMIT 20', ['crashed']);
+        this.history = rows.reverse();
+    }
+    
+    _calculateCrashPoint(serverSeed) {
+        // Provably Fair Calculation
+        const hash = crypto.createHmac('sha256', serverSeed).update('ARIX_TERMINAL_SALT').digest('hex');
+        const h = parseInt(hash.slice(0, 13), 16);
+        const e = 2 ** 52;
+        // This formula creates a nice distribution with more frequent low crashes.
+        if (h % 25 === 0) return 1.00; // 4% chance of instant crash
+        const crashPoint = Math.floor(100 * e / (e - h)) / 100;
+        return Math.max(1.01, crashPoint);
     }
 }
 
-// Export a singleton instance
 module.exports = new CrashGameEngine();

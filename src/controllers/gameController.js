@@ -1,6 +1,8 @@
-const { gameService } = require('../services/gameService');
-const userService = require('../services/userService');
+// ar_backend/src/controllers/gameController.js
+
+const gameService = require('../services/gameService');
 const { Address } = require('@ton/core');
+const pool = require('../config/db'); // Required for crash history
 
 const isValidTonAddress = (addr) => {
     if (!addr) return false;
@@ -11,8 +13,6 @@ const isValidTonAddress = (addr) => {
         return false;
     }
 };
-
-// --- Coinflip Handlers (Preserved) ---
 
 exports.handleCoinflipBet = async (req, res, next) => {
     try {
@@ -32,11 +32,13 @@ exports.handleCoinflipBet = async (req, res, next) => {
             return res.status(400).json({ message: "Invalid choice. Must be 'heads' or 'tails'." });
         }
 
+        // Call the service, which now correctly handles its own DB transactions.
         const gameResult = await gameService.playCoinflip({
             userWalletAddress,
             betAmountArix: numericBetAmount,
             choice
         });
+        
         res.status(200).json(gameResult);
 
     } catch (error) {
@@ -62,56 +64,36 @@ exports.getCoinflipHistoryForUser = async (req, res, next) => {
   }
 };
 
-// --- Crash Game Handlers (Production Ready) ---
-
-exports.getCrashState = (req, res) => {
-    const state = gameService.getCrashState();
-    res.status(200).json(state);
-};
-
-exports.getCrashHistory = async (req, res, next) => {
+/**
+ * Controller for fetching a user's personal Crash game history from the database.
+ */
+exports.getCrashHistoryForUser = async (req, res, next) => {
     try {
-        const history = await gameService.getCrashHistory();
-        res.status(200).json(history);
+        const { walletAddress } = req.params;
+        if (!isValidTonAddress(walletAddress)) {
+            return res.status(400).json({ message: "Invalid wallet address." });
+        }
+
+        const query = `
+            SELECT
+                cb.id,
+                cb.game_id,
+                cb.bet_amount_arix,
+                cb.status,
+                cb.cash_out_multiplier,
+                cb.payout_arix,
+                cb.placed_at,
+                cr.crash_multiplier
+            FROM crash_bets cb
+            JOIN crash_rounds cr ON cb.game_id = cr.id
+            WHERE cb.user_wallet_address = $1
+            ORDER BY cb.placed_at DESC
+            LIMIT 50;
+        `;
+        const { rows } = await pool.query(query, [walletAddress]);
+        res.status(200).json(rows);
     } catch (error) {
-        console.error("CTRL: Error in getCrashHistory:", error.message);
+        console.error("CTRL: Error fetching crash history:", error);
         next(error);
-    }
-};
-
-exports.placeCrashBet = async (req, res, next) => {
-    try {
-        const { userWalletAddress, betAmountArix } = req.body;
-        if (!isValidTonAddress(userWalletAddress)) {
-             return res.status(400).json({ message: "Invalid userWalletAddress." });
-        }
-        const numericBetAmount = parseFloat(betAmountArix);
-        if (isNaN(numericBetAmount) || numericBetAmount <= 0) {
-            return res.status(400).json({ message: "Invalid bet amount." });
-        }
-
-        const user = await userService.ensureUserExists(userWalletAddress);
-        const result = await gameService.placeCrashBet({
-            userId: user.id,
-            betAmountArix: numericBetAmount
-        });
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-};
-
-exports.cashOutCrashBet = async (req, res, next) => {
-    try {
-        const { userWalletAddress } = req.body;
-        if (!isValidTonAddress(userWalletAddress)) {
-             return res.status(400).json({ message: "Invalid userWalletAddress." });
-        }
-        
-        const user = await userService.ensureUserExists(userWalletAddress);
-        const result = await gameService.cashOutCrashBet({ userId: user.id });
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
     }
 };

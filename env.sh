@@ -1,3 +1,6 @@
+# --- Export variables for the 'railway up' command ---
+export DATABASE_URL='postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway'
+export POSTGRES_URL='postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway'
 export ARIX_TOKEN_MASTER_ADDRESS='EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd'
 export BACKEND_USDT_WALLET_ADDRESS='UQC7X42jH4O87Jpeo7kseX5HEXwEXKEm2S-FifEsjV2hgGpQ'
 export BACKEND_USDT_WALLET_MNEMONIC='soldier wife alpha airport between train enhance bench citizen rubber arrange gospel bright chase gesture lecture river affair denial coast ill miracle jacket genre'
@@ -7,6 +10,4 @@ export TELEGRAM_BOT_TOKEN='7733811914:AAEgyald8xwMTCRsHQxdR-bu6bvvgHCUSYY'
 export TON_NETWORK='testnet'
 export USDT_REWARD_JETTON_MASTER_ADDRESS='EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs'
 export USDT_TREASURY_WALLET_MNEMONIC='EQC0s4J8p69_mR1oP_6L13_S3j4w_4p5Xy_2j_Z'
-export DATABASE_URL='postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway'
-export POSTGRES_URL='postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway'
 export NODE_ENV='production'

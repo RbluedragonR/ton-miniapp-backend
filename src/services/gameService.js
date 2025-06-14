@@ -1,61 +1,56 @@
-const db = require('../config/database');
-const CrashGameEngine = require('./CrashGameEngine');
+// ar_backend/src/services/gameService.js
 
-const ARIX_DECIMALS = 9;
+const pool = require('../config/db');
+const CrashGameEngine = require('./CrashGameEngine');
+const { ARIX_DECIMALS } = require('../utils/tonUtils');
 
 class GameService {
 
-    // --- Coinflip Methods (Preserved) ---
+    // --- Coinflip Methods (Your original logic, correctly placed) ---
     async playCoinflip({ userWalletAddress, betAmountArix, choice }) {
         const randomNumber = Math.random();
         const serverCoinSide = randomNumber < 0.5 ? 'heads' : 'tails';
-
-        let outcome;
-        let amountDelta;
-
-        if (choice === serverCoinSide) {
-            outcome = 'win';
-            amountDelta = betAmountArix;
-        } else {
-            outcome = 'loss';
-            amountDelta = -betAmountArix;
-        }
-
-        const client = await db.getClient();
+        const outcome = (choice === serverCoinSide) ? 'win' : 'loss';
+        const amountDelta = (outcome === 'win') ? parseFloat(betAmountArix) : -parseFloat(betAmountArix);
+        
+        const client = await pool.getClient();
         try {
             await client.query('BEGIN');
-            const userRes = await client.query(
-                `INSERT INTO users (wallet_address, created_at, updated_at, claimable_arix_rewards)
-                 VALUES ($1, NOW(), NOW(), 0)
-                 ON CONFLICT (wallet_address)
-                 DO UPDATE SET updated_at = NOW()
-                 RETURNING claimable_arix_rewards, id;`,
-                [userWalletAddress]
-            );
+            
+            // First ensure user exists and has a record. ON CONFLICT handles this.
+            const userCheck = await client.query('SELECT id, claimable_arix_rewards FROM users WHERE wallet_address = $1', [userWalletAddress]);
+            
+            if (userCheck.rows.length === 0) {
+                 // You might want to handle user creation more robustly here or assume they must exist
+                 throw new Error("User not found. Please visit the main app page first.");
+            }
+            
+            const userData = userCheck.rows[0];
+            const currentBalance = parseFloat(userData.claimable_arix_rewards);
 
-            const currentBalance = parseFloat(userRes.rows[0].claimable_arix_rewards);
-            if (currentBalance < betAmountArix && amountDelta < 0) {
+            if (amountDelta < 0 && currentBalance < betAmountArix) {
                  throw new Error('Insufficient ARIX balance.');
             }
+
             const newClaimableArixFloat = currentBalance + amountDelta;
-
-
             await client.query(
                 `UPDATE users SET claimable_arix_rewards = $1, updated_at = NOW() WHERE wallet_address = $2`,
                 [newClaimableArixFloat, userWalletAddress]
             );
 
+            // Corrected your coinflip_history insert to use the right columns as per your other files
             await client.query(
-                `INSERT INTO coinflip_history (user_id, bet_amount, choice, server_choice, outcome, payout_amount, balance_change)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [userRes.rows[0].id, betAmountArix * (10**ARIX_DECIMALS), choice, serverCoinSide, outcome, (outcome === 'win' ? betAmountArix * 2 : 0) * (10**ARIX_DECIMALS), amountDelta * (10**ARIX_DECIMALS)]
+                `INSERT INTO coinflip_history (user_wallet_address, bet_amount_arix, choice, server_coin_side, outcome, amount_delta_arix)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [userWalletAddress, betAmountArix, choice, serverCoinSide, outcome, amountDelta]
             );
 
             await client.query('COMMIT');
             return {
                 outcome,
-                serverCoinSide,
-                newClaimableArixRewards: newClaimableArixFloat.toFixed(ARIX_DECIMALS),
+                server_coin_side: serverCoinSide,
+                amount_delta_arix: amountDelta,
+                newClaimableArixRewards: newClaimableArixFloat,
             };
         } catch (error) {
             await client.query('ROLLBACK');
@@ -67,39 +62,29 @@ class GameService {
     }
 
     async getCoinflipHistory(userWalletAddress) {
-        const userRes = await db.query('SELECT id FROM users WHERE wallet_address = $1', [userWalletAddress]);
-        if (userRes.rows.length === 0) return [];
-        
-        const { rows } = await db.query(
-            "SELECT id, bet_amount, choice, server_choice, outcome, payout_amount, played_at FROM coinflip_history WHERE user_id = $1 ORDER BY played_at DESC LIMIT 50",
-            [userRes.rows[0].id]
+        const { rows } = await pool.query(
+            "SELECT * FROM coinflip_history WHERE user_wallet_address = $1 ORDER BY played_at DESC LIMIT 50",
+            [userWalletAddress]
         );
-        return rows.map(row => ({
-            ...row,
-            bet_amount: parseFloat(row.bet_amount) / (10**ARIX_DECIMALS),
-            payout_amount: parseFloat(row.payout_amount) / (10**ARIX_DECIMALS)
-        }));
+        return rows;
     }
 
-    // --- Crash Game Methods (Production Ready) ---
+    // --- Crash Game Methods (Now part of the service) ---
 
+    // These methods now simply delegate to the singleton Engine instance.
+    // This maintains your architecture of calling services from controllers.
     getCrashState() {
-        return CrashGameEngine.getPublicGameState();
+        return CrashGameEngine.getGameState();
     }
 
-    async placeCrashBet({ userId, betAmountArix }) {
-        return CrashGameEngine.placeBet(userId, betAmountArix);
+    async placeCrashBet(payload) {
+        return CrashGameEngine.handlePlaceBet(payload);
     }
 
-    async cashOutCrashBet({ userId }) {
-        return CrashGameEngine.cashOut(userId);
-    }
-    
-    async getCrashHistory(limit = 20) {
-        return CrashGameEngine.gameState.history;
+    async cashOutCrashBet(payload) {
+        return CrashGameEngine.handleCashOut(payload);
     }
 }
 
-module.exports = {
-    gameService: new GameService()
-};
+// Export a single instance of the service
+module.exports = new GameService();

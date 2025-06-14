@@ -1,16 +1,15 @@
-
 const express = require('express');
-const gameController = require('../controllers/gameController'); 
-// const { authenticate } = require('../middlewares/authMiddleware'); // Optional: if auth is needed
+const gameController = require('../controllers/gameController');
 
 const router = express.Router();
 
-// POST /api/game/coinflip/bet - Handles a user placing a Coinflip bet
+// POST /api/game/coinflip/bet
 router.post('/coinflip/bet', gameController.handleCoinflipBet);
 
-// GET /api/game/coinflip/history/:userWalletAddress - Fetches Coinflip game history for a user
+// GET /api/game/coinflip/history/:userWalletAddress
 router.get('/coinflip/history/:userWalletAddress', gameController.getCoinflipHistoryForUser);
-// Note: If you have other games, you would add their routes here.
-// Example: router.post('/poker/bet', gameController.handlePokerBet);
+
+// GET /api/game/crash/history/:walletAddress
+router.get('/crash/history/:walletAddress', gameController.getCrashHistoryForUser);
 
 module.exports = router;
