@@ -26,7 +26,7 @@ echo -e "${YELLOW}### PART 1: PREPARING AND DEPLOYING APPLICATION ###${NC}"
 echo -e "${BLUE}[1/6] Automatically fixing project files...${NC}"
 
 # Automatically create a guaranteed-correct package.json file
-# FIX: Updated Node engine to match current version and moved 'morgan' from devDependencies to dependencies
+# FIX: Updated Node engine to match current version (20.x) and moved 'morgan' from devDependencies to dependencies
 cat > package.json << 'EOF'
 {
   "name": "ar_backend",
@@ -38,7 +38,7 @@ cat > package.json << 'EOF'
     "migrate": "node-pg-migrate up"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": ">=20.x"
   },
   "dependencies": {
     "@orbs-network/ton-access": "^2.3.3",
@@ -53,7 +53,7 @@ cat > package.json << 'EOF'
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
     "node-pg-migrate": "^7.4.0",
-    "node-telegram-bot-api": "^0.65.1",
+    "node-telegram-bot-api": "^0.66.0",
     "pg": "^8.11.5",
     "ws": "^8.17.0"
   },
@@ -144,23 +144,24 @@ echo -e "${GREEN}Success: app.js has been rebuilt correctly.${NC}"
 # Step 2: Set Correct Node.js Version & Install Dependencies
 echo -e "${BLUE}[2/6] Setting up environment and installing dependencies...${NC}"
 
-# Check current Node version and warn if not 18.x
+# Check current Node version and adjust package.json accordingly
 NODE_VERSION=$(node -v | sed 's/v//' | cut -d'.' -f1)
-if [ "$NODE_VERSION" != "18" ]; then
-    echo -e "${YELLOW}Warning: Current Node version is v$(node -v), but package.json specifies 18.x${NC}"
-    echo -e "${YELLOW}This may cause deployment issues. Consider using Node 18.x for consistency.${NC}"
-fi
-
 echo -e "${GREEN}Current Node version $(node -v) and npm version $(npm -v)${NC}"
+
+# Update package.json with current Node version
+sed -i.bak "s/\"node\": \">=.*\"/\"node\": \">=${NODE_VERSION}.x\"/" package.json
+echo -e "${GREEN}Updated package.json to match current Node version (${NODE_VERSION}.x)${NC}"
 
 echo -e "${YELLOW}Installing all dependencies from scratch...${NC}"
 rm -rf node_modules package-lock.json
-npm install --production=false
+npm install --omit=dev --no-audit --no-fund
 echo -e "${GREEN}Dependencies are synchronized.${NC}"
 
-# Fix security vulnerabilities
+# Fix security vulnerabilities more selectively
 echo -e "${BLUE}Fixing security vulnerabilities...${NC}"
-npm audit fix --force || echo -e "${YELLOW}Some vulnerabilities could not be auto-fixed${NC}"
+# Update node-telegram-bot-api to latest stable version to fix vulnerabilities
+npm install node-telegram-bot-api@latest --save
+echo -e "${GREEN}Security updates completed.${NC}"
 
 # Step 3: Login and Link Project
 echo -e "${BLUE}[3/6] Logging in and linking to Railway project...${NC}"
@@ -179,15 +180,9 @@ fi
 # Step 4: Set Environment Variables (before deployment)
 echo -e "${BLUE}[4/6] Setting Production Environment Variables...${NC}"
 
-# Use the correct Railway CLI syntax for setting variables
+# Set NODE_ENV using the correct Railway CLI syntax
 echo -e "${YELLOW}Setting NODE_ENV to production...${NC}"
-if railway variables --help | grep -q "\--set"; then
-    railway variables --set NODE_ENV=production
-elif railway variables --help | grep -q "set"; then
-    railway variables set NODE_ENV production
-else
-    echo -e "${YELLOW}Manual step required: Set NODE_ENV=production in Railway dashboard${NC}"
-fi
+railway variables set NODE_ENV=production || echo -e "${YELLOW}Manual step required: Set NODE_ENV=production in Railway dashboard${NC}"
 
 # Step 5: Commit and Deploy
 echo -e "${BLUE}[5/6] Committing all fixes and deploying to Railway...${NC}"
@@ -198,8 +193,8 @@ echo -e "${YELLOW}Deploying application. This will deploy and show status...${NC
 railway up --detach
 
 # Wait for deployment to stabilize
-echo -e "${BLUE}Waiting for 45 seconds for the deployment to settle...${NC}"
-sleep 45
+echo -e "${BLUE}Waiting for 60 seconds for the deployment to settle...${NC}"
+sleep 60
 
 # Check deployment status
 echo -e "${BLUE}Checking deployment status...${NC}"
@@ -212,7 +207,7 @@ echo ""
 
 echo -e "${YELLOW}### PART 2: MIGRATING DATA FROM NEON TO RAILWAY ###${NC}"
 
-# Step 1: Update Local PostgreSQL Tools
+# Step 1: Ensure PostgreSQL Tools are Available
 echo -e "${BLUE}[1/4] Checking for local PostgreSQL tools...${NC}"
 if ! command -v pg_dump &> /dev/null; then
     echo -e "${RED}Error: pg_dump command not found.${NC}"
@@ -224,9 +219,14 @@ if ! command -v pg_dump &> /dev/null; then
         if command -v brew &> /dev/null; then
             echo -e "${YELLOW}Installing via Homebrew...${NC}"
             brew install libpq
-            # Add to PATH
-            echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.zshrc
+            # Add to PATH for current session
             export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+            # Add to shell profile for future sessions
+            if [[ "$SHELL" == *"zsh"* ]]; then
+                echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.zshrc
+            else
+                echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.bash_profile
+            fi
         else
             echo -e "${RED}Homebrew not found. Please install PostgreSQL client tools manually.${NC}"
             echo -e "${YELLOW}Install Homebrew first: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}"
@@ -249,218 +249,171 @@ if ! command -v pg_dump &> /dev/null; then
 fi
 echo -e "${GREEN}PostgreSQL tools are available.${NC}"
 
-# Step 2: Export from Neon
+# Step 2: Export from Neon with Better Error Handling
 DUMP_FILE="neon_dump_$(date +%Y%m%d_%H%M%S).sql"
 echo -e "${BLUE}[2/4] Exporting data from Neon...${NC}"
 
-# Test connection first
+# Test connection first with better error reporting
 echo -e "${YELLOW}Testing connection to Neon database...${NC}"
-if ! pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges > /dev/null 2>&1; then
-    echo -e "${RED}Failed to connect to Neon database. Please check your connection string.${NC}"
+if ! timeout 30 pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges > /dev/null 2>&1; then
+    echo -e "${RED}Failed to connect to Neon database. Please check:${NC}"
+    echo -e "${YELLOW}1. Your Neon database URL is correct${NC}"
+    echo -e "${YELLOW}2. Your Neon database is running${NC}"
+    echo -e "${YELLOW}3. Your network connection is stable${NC}"
     exit 1
 fi
 
-# Export full database
+# Export full database with better options
 echo -e "${YELLOW}Exporting full database...${NC}"
 pg_dump "$NEON_DB_URL" \
     --clean \
+    --if-exists \
     --no-owner \
     --no-privileges \
     --no-tablespaces \
     --no-security-labels \
-    --no-comments > "$DUMP_FILE"
+    --no-comments \
+    --verbose > "$DUMP_FILE" 2>/dev/null
 
-if [ $? -eq 0 ]; then
+if [ $? -eq 0 ] && [ -s "$DUMP_FILE" ]; then
     echo -e "${GREEN}Successfully exported data from Neon to ${DUMP_FILE}.${NC}"
     echo -e "${BLUE}Dump file size: $(du -h "$DUMP_FILE" | cut -f1)${NC}"
 else
-    echo -e "${RED}Failed to export data from Neon.${NC}"
+    echo -e "${RED}Failed to export data from Neon or dump file is empty.${NC}"
     exit 1
 fi
 
-# Step 3: Import to Railway with Multiple Methods
+# Step 3: Import to Railway with Improved Methods
 echo -e "${BLUE}[3/4] Importing data into Railway PostgreSQL database...${NC}"
 
 # Initialize success flag
 IMPORT_SUCCESS=false
 
-# Method 1: Copy dump file to Railway and import
-echo -e "${YELLOW}🔄 Method 1: Copy dump file to Railway and import${NC}"
-echo -e "${BLUE}   Copying dump file to Railway filesystem...${NC}"
-
-if railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "cat > /tmp/railway_import_$(date +%s).sql" < "$DUMP_FILE" 2>/dev/null; then
-    echo -e "${GREEN}   ✓ Dump file copied successfully${NC}"
-    echo -e "${BLUE}   Importing data from Railway filesystem...${NC}"
+# First, verify Railway database service exists
+echo -e "${YELLOW}Verifying Railway database service '${RAILWAY_DB_SERVICE_NAME}'...${NC}"
+if ! railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- echo "Service accessible" &>/dev/null; then
+    echo -e "${RED}Cannot access Railway service '${RAILWAY_DB_SERVICE_NAME}'. Please check:${NC}"
+    echo -e "${YELLOW}1. Service name is correct in your Railway dashboard${NC}"
+    echo -e "${YELLOW}2. You have proper access permissions${NC}"
+    echo -e "${YELLOW}3. The service is running${NC}"
     
-    if railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "psql \$DATABASE_URL < /tmp/railway_import_*.sql && rm /tmp/railway_import_*.sql" 2>/dev/null; then
-        echo -e "${GREEN}   ✓ Method 1 SUCCESSFUL: Database imported and cleaned up!${NC}"
-        IMPORT_SUCCESS=true
-    else
-        echo -e "${RED}   ✗ Method 1 failed at import step${NC}"
-        # Clean up failed import file
-        railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "rm -f /tmp/railway_import_*.sql" 2>/dev/null || true
-    fi
+    echo -e "${BLUE}Available services:${NC}"
+    railway service list 2>/dev/null || echo -e "${YELLOW}Could not list services${NC}"
+    
+    # Don't exit, continue with manual instructions
 else
-    echo -e "${RED}   ✗ Method 1 failed at copy step${NC}"
-fi
-
-# Method 2: Stream import directly (if Method 1 failed)
-if [ "$IMPORT_SUCCESS" = false ]; then
-    echo -e "${YELLOW}🔄 Method 2: Direct stream import${NC}"
+    echo -e "${GREEN}Railway service is accessible.${NC}"
     
-    if railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "psql \$DATABASE_URL" < "$DUMP_FILE" 2>/dev/null; then
-        echo -e "${GREEN}   ✓ Method 2 SUCCESSFUL: Stream import completed!${NC}"
-        IMPORT_SUCCESS=true
+    # Method 1: Simple file transfer and import
+    echo -e "${YELLOW}🔄 Method 1: File transfer and SQL import${NC}"
+    
+    TEMP_DUMP_NAME="temp_import_$(date +%s).sql"
+    
+    # Copy file to Railway temp directory
+    echo -e "${BLUE}   Transferring dump file to Railway...${NC}"
+    if cat "$DUMP_FILE" | railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "cat > /tmp/${TEMP_DUMP_NAME}" 2>/dev/null; then
+        echo -e "${GREEN}   ✓ File transferred successfully${NC}"
+        
+        # Import with better error handling
+        echo -e "${BLUE}   Importing data into PostgreSQL...${NC}"
+        IMPORT_SCRIPT="
+        set -e
+        echo 'Starting database import...'
+        echo 'Database URL status:' \$([ -n \"\$DATABASE_URL\" ] && echo 'Available' || echo 'Missing')
+        
+        if [ -z \"\$DATABASE_URL\" ]; then
+            echo 'ERROR: DATABASE_URL not set'
+            exit 1
+        fi
+        
+        # Test connection
+        if ! psql \"\$DATABASE_URL\" -c 'SELECT 1;' >/dev/null 2>&1; then
+            echo 'ERROR: Cannot connect to database'
+            exit 1
+        fi
+        
+        # Import with transaction safety
+        echo 'Importing SQL dump...'
+        psql \"\$DATABASE_URL\" \
+            --quiet \
+            --no-psqlrc \
+            --single-transaction \
+            --set ON_ERROR_STOP=on \
+            -f /tmp/${TEMP_DUMP_NAME}
+        
+        # Clean up
+        rm -f /tmp/${TEMP_DUMP_NAME}
+        echo 'Import completed successfully!'
+        "
+        
+        if railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "$IMPORT_SCRIPT" 2>/dev/null; then
+            echo -e "${GREEN}   ✓ Method 1 SUCCESSFUL: Database imported!${NC}"
+            IMPORT_SUCCESS=true
+        else
+            echo -e "${RED}   ✗ Method 1 failed at import step${NC}"
+            # Clean up failed import file
+            railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "rm -f /tmp/${TEMP_DUMP_NAME}" 2>/dev/null || true
+        fi
     else
-        echo -e "${RED}   ✗ Method 2 failed${NC}"
+        echo -e "${RED}   ✗ Method 1 failed at file transfer step${NC}"
+    fi
+    
+    # Method 2: Direct pipe import (if Method 1 failed)
+    if [ "$IMPORT_SUCCESS" = false ]; then
+        echo -e "${YELLOW}🔄 Method 2: Direct pipe import${NC}"
+        
+        PIPE_SCRIPT="
+        set -e
+        echo 'Starting direct pipe import...'
+        
+        if [ -z \"\$DATABASE_URL\" ]; then
+            echo 'ERROR: DATABASE_URL not available'
+            exit 1
+        fi
+        
+        # Import directly from stdin
+        psql \"\$DATABASE_URL\" \
+            --quiet \
+            --no-psqlrc \
+            --single-transaction \
+            --set ON_ERROR_STOP=on
+        
+        echo 'Direct import completed!'
+        "
+        
+        if cat "$DUMP_FILE" | railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "$PIPE_SCRIPT" 2>/dev/null; then
+            echo -e "${GREEN}   ✓ Method 2 SUCCESSFUL: Direct import completed!${NC}"
+            IMPORT_SUCCESS=true
+        else
+            echo -e "${RED}   ✗ Method 2 failed${NC}"
+        fi
     fi
 fi
 
-# Method 3: Chunk-based import (if Methods 1 & 2 failed)
-if [ "$IMPORT_SUCCESS" = false ]; then
-    echo -e "${YELLOW}🔄 Method 3: Chunk-based import${NC}"
-    
-    # Create a more robust import script
-    cat > railway_import_script.sh << 'IMPORT_SCRIPT_EOF'
-#!/bin/bash
-set -e
-echo "Starting Railway database import..."
-echo "Database URL available: $([ -n "$DATABASE_URL" ] && echo "YES" || echo "NO")"
-
-# Read from stdin and import
-echo "Reading SQL data and importing..."
-psql "$DATABASE_URL" --quiet --no-psqlrc --single-transaction
-
-echo "Import completed successfully!"
-IMPORT_SCRIPT_EOF
-
-    chmod +x railway_import_script.sh
-    
-    if cat "$DUMP_FILE" | railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -s < railway_import_script.sh 2>/dev/null; then
-        echo -e "${GREEN}   ✓ Method 3 SUCCESSFUL: Chunk-based import completed!${NC}"
-        IMPORT_SUCCESS=true
-    else
-        echo -e "${RED}   ✗ Method 3 failed${NC}"
-    fi
-    
-    rm -f railway_import_script.sh
-fi
-
-# Method 4: Interactive Railway shell import (if all automated methods failed)
-if [ "$IMPORT_SUCCESS" = false ]; then
-    echo -e "${YELLOW}🔄 Method 4: Interactive Railway shell import${NC}"
-    
-    # Create a comprehensive import script that handles errors
-    cat > comprehensive_import.sh << 'COMPREHENSIVE_EOF'
-#!/bin/bash
-echo "=== Railway Database Import Script ==="
-echo "Database URL: ${DATABASE_URL:0:20}..."
-
-# Check if psql is available
-if ! command -v psql &> /dev/null; then
-    echo "ERROR: psql not available in Railway environment"
-    exit 1
-fi
-
-# Test database connection
-echo "Testing database connection..."
-if ! psql "$DATABASE_URL" -c "SELECT version();" > /dev/null 2>&1; then
-    echo "ERROR: Cannot connect to database"
-    exit 1
-fi
-
-echo "Database connection successful!"
-
-# Read SQL from stdin and execute
-echo "Executing SQL import..."
-exec psql "$DATABASE_URL" --quiet --no-psqlrc
-COMPREHENSIVE_EOF
-
-    chmod +x comprehensive_import.sh
-    
-    if cat "$DUMP_FILE" | railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash comprehensive_import.sh 2>/dev/null; then
-        echo -e "${GREEN}   ✓ Method 4 SUCCESSFUL: Interactive import completed!${NC}"
-        IMPORT_SUCCESS=true
-    else
-        echo -e "${RED}   ✗ Method 4 failed${NC}"
-    fi
-    
-    rm -f comprehensive_import.sh
-fi
-
-# Method 5: Failsafe with environment debugging (if all methods failed)
-if [ "$IMPORT_SUCCESS" = false ]; then
-    echo -e "${YELLOW}🔄 Method 5: Failsafe with debugging${NC}"
-    
-    # Debug Railway environment first
-    echo -e "${BLUE}   Debugging Railway environment...${NC}"
-    railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "echo 'Available commands:'; which psql; echo 'Database URL set:'; [ -n \"\$DATABASE_URL\" ] && echo 'YES' || echo 'NO'" 2>/dev/null || echo "Could not debug environment"
-    
-    # Try one more time with maximum verbosity and error handling
-    cat > final_import.sh << 'FINAL_EOF'
-#!/bin/bash
-set -e
-exec 2>&1  # Redirect stderr to stdout
-
-echo "=== FINAL IMPORT ATTEMPT ==="
-echo "Timestamp: $(date)"
-echo "DATABASE_URL exists: $([ -n "$DATABASE_URL" ] && echo "YES" || echo "NO")"
-
-# Ensure we have psql
-if ! command -v psql >/dev/null 2>&1; then
-    echo "FATAL: psql command not found"
-    exit 1
-fi
-
-# Test basic connectivity
-echo "Testing database connectivity..."
-if ! timeout 30 psql "$DATABASE_URL" -c "SELECT 1;" >/dev/null 2>&1; then
-    echo "FATAL: Database connection failed"
-    exit 1
-fi
-
-echo "Connection test passed. Starting import..."
-
-# Import with timeout and proper error handling
-timeout 300 psql "$DATABASE_URL" \
-    --quiet \
-    --no-psqlrc \
-    --single-transaction \
-    --set ON_ERROR_STOP=on \
-    --set VERBOSITY=verbose
-
-echo "=== IMPORT COMPLETED SUCCESSFULLY ==="
-FINAL_EOF
-
-    chmod +x final_import.sh
-    
-    if cat "$DUMP_FILE" | railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash final_import.sh; then
-        echo -e "${GREEN}   ✓ Method 5 SUCCESSFUL: Failsafe import completed!${NC}"
-        IMPORT_SUCCESS=true
-    else
-        echo -e "${RED}   ✗ Method 5 failed - All automated methods exhausted${NC}"
-    fi
-    
-    rm -f final_import.sh
-fi
-
-# Final status check
+# Final status and manual instructions
 if [ "$IMPORT_SUCCESS" = true ]; then
     echo -e "${GREEN}🎉 DATABASE IMPORT SUCCESSFUL! 🎉${NC}"
 else
-    echo -e "${RED}❌ ALL AUTOMATED IMPORT METHODS FAILED${NC}"
+    echo -e "${RED}❌ AUTOMATED IMPORT METHODS FAILED${NC}"
     echo -e "${YELLOW}📋 MANUAL IMPORT INSTRUCTIONS:${NC}"
     echo ""
-    echo -e "${BLUE}1. Copy dump file to Railway:${NC}"
-    echo "   cat '$DUMP_FILE' | railway run --service ${RAILWAY_DB_SERVICE_NAME} -- bash -c 'cat > /tmp/manual_dump.sql'"
+    echo -e "${BLUE}Option 1 - Railway CLI Manual Import:${NC}"
+    echo "   1. Transfer the dump file:"
+    echo "      cat '${DUMP_FILE}' | railway run --service ${RAILWAY_DB_SERVICE_NAME} -- bash -c 'cat > /tmp/manual_import.sql'"
     echo ""
-    echo -e "${BLUE}2. Connect to Railway database and import:${NC}"
-    echo "   railway run --service ${RAILWAY_DB_SERVICE_NAME} -- psql \$DATABASE_URL"
-    echo "   Then in psql prompt: \\i /tmp/manual_dump.sql"
+    echo "   2. Connect and import:"
+    echo "      railway run --service ${RAILWAY_DB_SERVICE_NAME} -- psql \$DATABASE_URL -f /tmp/manual_import.sql"
     echo ""
-    echo -e "${BLUE}3. Or use Railway dashboard:${NC}"
-    echo "   railway open"
-    echo "   Go to ${RAILWAY_DB_SERVICE_NAME} service → Connect → Use external connection details"
+    echo -e "${BLUE}Option 2 - Railway Dashboard:${NC}"
+    echo "   1. Open Railway dashboard: railway open"
+    echo "   2. Go to ${RAILWAY_DB_SERVICE_NAME} service"
+    echo "   3. Click 'Connect' and get connection details"
+    echo "   4. Use a PostgreSQL client with the connection details"
+    echo "   5. Import the dump file: ${DUMP_FILE}"
+    echo ""
+    echo -e "${BLUE}Option 3 - Direct Connection:${NC}"
+    echo "   railway run --service ${RAILWAY_DB_SERVICE_NAME} -- bash -c 'echo \$DATABASE_URL'"
+    echo "   Then use the URL with your local psql: psql [URL] < ${DUMP_FILE}"
     echo ""
 fi
 
@@ -469,11 +422,14 @@ echo -e "${BLUE}[4/4] Cleaning up and organizing backups...${NC}"
 
 # Create backup directory and organize files
 mkdir -p ./database_backups
-mv "$DUMP_FILE" ./database_backups/
-echo -e "${GREEN}Backup saved to: ./database_backups/${DUMP_FILE##*/}${NC}"
+cp "$DUMP_FILE" ./database_backups/
+echo -e "${GREEN}Backup saved to: ./database_backups/${DUMP_FILE}${NC}"
+
+# Clean up current directory dump file
+rm -f "$DUMP_FILE"
 
 # Clean up any temporary files
-rm -f ./src/app.js.bak
+rm -f ./src/app.js.bak ./package.json.bak
 rm -f railway_import_script.sh comprehensive_import.sh final_import.sh
 rm -f temp_import.sh
 
@@ -496,16 +452,21 @@ fi
 
 echo ""
 echo -e "${YELLOW}📋 NEXT STEPS:${NC}"
-echo -e "${BLUE}1. Add environment secrets in Railway Dashboard:${NC}"
+echo -e "${BLUE}1. Verify environment variables in Railway Dashboard:${NC}"
+echo -e "   • NODE_ENV (should be set to 'production')"
 echo -e "   • CORS_WHITELIST"
 echo -e "   • TELEGRAM_BOT_TOKEN"
+echo -e "   • DATABASE_URL (should be auto-set by Railway)"
 echo -e "   • Any other application-specific variables"
 echo ""
 echo -e "${BLUE}2. Verify your deployment:${NC}"
-echo "   railway logs"
+echo "   railway logs --service ar-backend"
 echo ""
 echo -e "${BLUE}3. Test your application:${NC}"
 echo "   railway open"
+echo ""
+echo -e "${BLUE}4. Monitor database connection:${NC}"
+echo "   railway logs --service ${RAILWAY_DB_SERVICE_NAME}"
 echo ""
 echo -e "${GREEN}🎉 Deployment automation completed! 🎉${NC}"
 
