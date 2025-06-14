@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v6 - Final) ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v7 - Ultimate Compatibility) ---${NC}"
 echo ""
 
 # --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
@@ -118,11 +118,9 @@ echo -e "${YELLOW}Pulling production environment variables from Vercel project '
 if ! vercel pull --yes --environment=production; then
     echo -e "${RED}Failed to pull environment variables from Vercel.${NC}"
     echo -e "${YELLOW}Please ensure this local directory is linked to the '${VERCEL_PROJECT_NAME}' project on Vercel.${NC}"
-    echo -e "${YELLOW}You can link it by running 'vercel link' and following the prompts.${NC}"
     exit 1
 fi
 
-# *** FIX: Point to the correct path where Vercel CLI creates the env file ***
 PULLED_ENV_FILE=".vercel/.env.production.local"
 if [ ! -f "$PULLED_ENV_FILE" ]; then
     echo -e "${RED}FATAL: 'vercel pull' completed but the environment file at '${PULLED_ENV_FILE}' was not found.${NC}"
@@ -140,7 +138,6 @@ while IFS= read -r line || [[ -n "$line" ]]; do
         echo -e "- Skipping old database URL: ${line%%=*}"
     else
         echo "$line" >> "$ENV_FILE"
-        echo "- Wrote ${line%%=*} to ${ENV_FILE}"
     fi
 done < "$PULLED_ENV_FILE"
 echo -e "${GREEN}✓ Vercel environment variables prepared.${NC}"
@@ -150,18 +147,24 @@ echo "DATABASE_URL=\"${RAILWAY_DB_URL}\"" >> "$ENV_FILE"
 echo "POSTGRES_URL=\"${RAILWAY_DB_URL}\"" >> "$ENV_FILE"
 echo "NODE_ENV=\"production\"" >> "$ENV_FILE"
 echo "TELEGRAM_BOT_TOKEN=\"7733811914:AAEgyald8xwMTCRsHQxdR-bu6bvvgHCUSYY\"" >> "$ENV_FILE"
-
 echo -e "${GREEN}✓ Temporary environment file '${ENV_FILE}' is ready.${NC}"
-echo "--- Contents of ${ENV_FILE} ---"
-cat "${ENV_FILE}"
-echo "------------------------------"
 
-# Step 6: Deploy to Railway using the .env file
-echo -e "${BLUE}[6/8] Deploying to Railway with environment file...${NC}"
+# Step 6: Deploy to Railway by EXPORTING variables
+echo -e "${BLUE}[6/8] Deploying to Railway by exporting variables...${NC}"
 git add .
 git commit -m "Railway deployment: Automated configuration" --allow-empty
-echo -e "${YELLOW}Initiating Railway deployment using variables from '${ENV_FILE}'...${NC}"
-railway up --detach --env-file "${ENV_FILE}"
+
+# *** FIX: Source the .env file to export all variables to the shell environment ***
+# This is the most compatible method and does not depend on any specific CLI flags.
+echo -e "${YELLOW}Exporting variables to the current shell session...${NC}"
+set -a # Automatically export all variables defined from now on
+source "${ENV_FILE}"
+set +a # Stop automatically exporting
+echo -e "${GREEN}✓ Variables exported to environment. The 'railway up' command will now inherit them.${NC}"
+
+echo -e "${YELLOW}Initiating Railway deployment...${NC}"
+railway up --detach
+
 echo -e "${BLUE}Waiting for deployment to stabilize (90 seconds)...${NC}"
 sleep 90
 echo -e "${BLUE}Verifying deployment status...${NC}"
