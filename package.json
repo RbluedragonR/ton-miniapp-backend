@@ -8,7 +8,7 @@
     "migrate": "node-pg-migrate up"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18.x"
   },
   "dependencies": {
     "@orbs-network/ton-access": "^2.3.3",
@@ -23,7 +23,7 @@
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
     "node-pg-migrate": "^7.4.0",
-    "node-telegram-bot-api": "^0.65.1",
+    "node-telegram-bot-api": "^0.63.0",
     "pg": "^8.11.5",
     "ws": "^8.17.0"
   },
