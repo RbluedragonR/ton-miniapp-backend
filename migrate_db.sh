@@ -2,34 +2,43 @@
 set -e
 
 # --- Configuration ---
-# Fully automated script - all values are hardcoded below.
-RAILWAY_DB_SERVICE_NAME="Postgres-cMD6"
-NEON_DB_URL="postgresql://neondb_owner:npg_0ngYqcX8vSQI@ep-proud-math-a4sxlwf8-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
+# Review and confirm these values before running.
 RAILWAY_PROJECT_NAME="ar-backend"
-# AUTOMATION: Hardcoded Railway Database URL as requested.
-RAILWAY_DB_URL="postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway"
-# AUTOMATION: Hardcoded Project ID from your screenshot to fix CLI version issues.
-RAILWAY_PROJECT_ID="42bb1cdd-7437-4092-82e1-93d44b5a1498"
+RAILWAY_PROJECT_ID="42bb1cdd-7437-4092-82e1-93d44b5a1498" # Used for the initial link attempt
+RAILWAY_DB_SERVICE_NAME="Postgres-cMD6"
+VERCEL_PROJECT_NAME="arix-tma-frontend" # Set your Vercel project name here
 
+# Hardcoded URLs for full automation
+NEON_DB_URL="postgresql://neondb_owner:npg_0ngYqcX8vSQI@ep-proud-math-a4sxlwf8-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
+RAILWAY_DB_URL="postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway"
 
 # --- Colors for Output ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v6 - Final) ---${NC}"
 echo ""
 
-# --- PART 1: AUTO-FIXING & DEPLOYING APPLICATION ---
+# --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
 
 echo -e "${YELLOW}### PART 1: PREPARING AND DEPLOYING APPLICATION ###${NC}"
 
-# Step 1: Automated Code & Dependency Fix
-echo -e "${BLUE}[1/6] Automatically fixing project files...${NC}"
+# Step 1: Tool Verification
+echo -e "${BLUE}[1/8] Verifying required tools...${NC}"
+for tool in railway vercel psql pg_dump; do
+    if ! command -v $tool &> /dev/null; then
+        echo -e "${RED}FATAL: Required tool '$tool' is not installed. Please install it and re-run.${NC}"
+        exit 1
+    fi
+done
+echo -e "${GREEN}✓ All required tools are available.${NC}"
 
-# Create optimized package.json with exact versions for better stability
+
+# Step 2: Automatically fixing project files
+echo -e "${BLUE}[2/8] Automatically fixing project files...${NC}"
 cat > package.json << 'EOF'
 {
   "name": "ar_backend",
@@ -66,133 +75,28 @@ cat > package.json << 'EOF'
   }
 }
 EOF
-echo -e "${GREEN}Success: package.json updated with stable versions.${NC}"
+echo -e "${GREEN}✓ package.json updated with stable versions.${NC}"
 
-# Create optimized app.js with better error handling
-cat > ./src/app.js << 'EOF'
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
-const { FRONTEND_URL, NODE_ENV } = require('./config/envConfig');
-const userRoutes = require('./routes/userRoutes');
-const gameRoutes = require('./routes/gameRoutes');
-const earnRoutes = require('./routes/earnRoutes');
-const taskRoutes = require('./routes/taskRoutes');
-const referralRoutes = require('./routes/referralRoutes');
-const pushRoutes = require('./routes/pushRoutes');
-const { generalErrorHandler, notFoundHandler } = require('./middlewares/errorHandler');
-
-const app = express();
-
-app.use(helmet({
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false
-}));
-
-const corsOrigins = process.env.CORS_WHITELIST 
-    ? process.env.CORS_WHITELIST.split(',')
-    : [FRONTEND_URL, 'http://localhost:5173', 'https://web.telegram.org'];
-
-console.log('[CORS Setup] Allowed Origins:', corsOrigins);
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (origin.includes('web.telegram.org')) return callback(null, true);
-        if (origin.includes('railway.app')) return callback(null, true);
-        if (corsOrigins.some(allowedOrigin => origin && origin.includes(allowedOrigin))) {
-            return callback(null, true);
-        }
-        console.warn(`CORS Warning: Origin '${origin}' not in whitelist`);
-        callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-};
-app.use(cors(corsOptions));
-
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 500,
-    message: { error: 'Too many requests, please try again later.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => req.headers['user-agent']?.includes('Railway') || false
-});
-app.use(limiter);
-
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-if (NODE_ENV === 'development') {
-    app.use(morgan('dev'));
-} else {
-    app.use(morgan('combined'));
-}
-
-app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'healthy', 
-        timestamp: new Date().toISOString(),
-        environment: NODE_ENV 
-    });
-});
-
-app.get('/', (req, res) => {
-    res.json({ 
-        message: 'ARIX Terminal Backend is running on Railway!',
-        version: '1.0.0',
-        status: 'active'
-    });
-});
-
-app.use('/api/users', userRoutes);
-app.use('/api/game', gameRoutes);
-app.use('/api/earn', earnRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/push', pushRoutes);
-
-app.use(notFoundHandler);
-app.use(generalErrorHandler);
-
-module.exports = app;
-EOF
-echo -e "${GREEN}Success: app.js optimized for Railway deployment.${NC}"
-
-# Step 2: Enhanced dependency management
-echo -e "${BLUE}[2/6] Setting up environment and installing dependencies...${NC}"
-echo -e "${YELLOW}Performing clean dependency installation...${NC}"
+# Step 3: Enhanced dependency management
+echo -e "${BLUE}[3/8] Setting up environment and installing dependencies...${NC}"
+echo "Performing clean dependency installation..."
 rm -rf node_modules package-lock.json
 npm cache clean --force 2>/dev/null || true
-npm install --production --no-audit --no-fund --prefer-offline
-echo -e "${GREEN}Production dependencies installed successfully.${NC}"
+npm install --no-audit --no-fund
+echo -e "${GREEN}✓ Production dependencies installed successfully.${NC}"
 
-# Step 3: Railway authentication and linking
-echo -e "${BLUE}[3/6] Authenticating and linking with Railway...${NC}"
-if ! command -v railway &> /dev/null; then
-    echo -e "${RED}FATAL: Railway CLI not found. Please install it before running this script.${NC}"
-    exit 1
-fi
-
-echo -e "${YELLOW}Attempting to upgrade Railway CLI to the latest version...${NC}"
-railway upgrade || echo -e "${YELLOW}Could not automatically upgrade Railway CLI. Continuing with existing version...${NC}"
-
-
+# Step 4: Railway authentication and linking (with interactive fallback)
+echo -e "${BLUE}[4/8] Authenticating and linking with Railway...${NC}"
 if ! railway whoami &>/dev/null; then
     echo -e "${YELLOW}Not logged in to Railway. Attempting login...${NC}"
     railway login
 fi
 
 if [ ! -f "railway.json" ]; then
-    echo -e "${YELLOW}Project not linked. Linking to project ID for '${RAILWAY_PROJECT_NAME}' automatically...${NC}"
-    
-    if ! railway link "$RAILWAY_PROJECT_ID"; then
-        echo -e "${YELLOW}Direct link failed. This can happen with older CLI versions.${NC}"
-        echo -e "${YELLOW}Falling back to interactive linking. Please select your project from the list below.${NC}"
+    echo -e "${YELLOW}Project not linked. Attempting to link to project ID for '${RAILWAY_PROJECT_NAME}'...${NC}"
+    if ! railway link "$RAILWAY_PROJECT_ID" 2>/dev/null; then
+        echo -e "${YELLOW}Direct link with Project ID failed (common with older CLI versions).${NC}"
+        echo -e "${YELLOW}Falling back to interactive linking. Please select your project below.${NC}"
         if ! railway link; then
             echo -e "${RED}FATAL: Interactive linking also failed. Cannot proceed.${NC}"
             exit 1
@@ -203,16 +107,61 @@ else
     echo -e "${GREEN}✓ Project already linked to Railway.${NC}"
 fi
 
-# Step 4: Environment variables setup
-echo -e "${BLUE}[4/6] Configuring environment variables...${NC}"
-railway variables set NODE_ENV=production || echo -e "${YELLOW}Could not set NODE_ENV. Please set it manually.${NC}"
+# Step 5: Create .env file from Vercel and local settings
+echo -e "${BLUE}[5/8] Syncing environment variables from Vercel using 'vercel pull'...${NC}"
+if ! vercel whoami &>/dev/null; then
+    echo -e "${YELLOW}Not logged in to Vercel. Attempting login...${NC}"
+    vercel login
+fi
 
-# Step 5: Commit and deploy with Railway
-echo -e "${BLUE}[5/6] Deploying to Railway...${NC}"
+echo -e "${YELLOW}Pulling production environment variables from Vercel project '${VERCEL_PROJECT_NAME}'...${NC}"
+if ! vercel pull --yes --environment=production; then
+    echo -e "${RED}Failed to pull environment variables from Vercel.${NC}"
+    echo -e "${YELLOW}Please ensure this local directory is linked to the '${VERCEL_PROJECT_NAME}' project on Vercel.${NC}"
+    echo -e "${YELLOW}You can link it by running 'vercel link' and following the prompts.${NC}"
+    exit 1
+fi
+
+# *** FIX: Point to the correct path where Vercel CLI creates the env file ***
+PULLED_ENV_FILE=".vercel/.env.production.local"
+if [ ! -f "$PULLED_ENV_FILE" ]; then
+    echo -e "${RED}FATAL: 'vercel pull' completed but the environment file at '${PULLED_ENV_FILE}' was not found.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Successfully found pulled Vercel environment file at '${PULLED_ENV_FILE}'.${NC}"
+
+ENV_FILE=".env.railway"
+> "$ENV_FILE" # Create a clean .env file for Railway deployment
+
+echo -e "${YELLOW}Writing Vercel variables to temporary file '${ENV_FILE}'...${NC}"
+while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ -z "$line" ]] || [[ "$line" == \#* ]]; then continue; fi
+    if [[ "$line" == POSTGRES_URL* ]] || [[ "$line" == DATABASE_URL* ]]; then
+        echo -e "- Skipping old database URL: ${line%%=*}"
+    else
+        echo "$line" >> "$ENV_FILE"
+        echo "- Wrote ${line%%=*} to ${ENV_FILE}"
+    fi
+done < "$PULLED_ENV_FILE"
+echo -e "${GREEN}✓ Vercel environment variables prepared.${NC}"
+
+echo -e "${YELLOW}Adding Railway-specific variables to ${ENV_FILE}...${NC}"
+echo "DATABASE_URL=\"${RAILWAY_DB_URL}\"" >> "$ENV_FILE"
+echo "POSTGRES_URL=\"${RAILWAY_DB_URL}\"" >> "$ENV_FILE"
+echo "NODE_ENV=\"production\"" >> "$ENV_FILE"
+echo "TELEGRAM_BOT_TOKEN=\"7733811914:AAEgyald8xwMTCRsHQxdR-bu6bvvgHCUSYY\"" >> "$ENV_FILE"
+
+echo -e "${GREEN}✓ Temporary environment file '${ENV_FILE}' is ready.${NC}"
+echo "--- Contents of ${ENV_FILE} ---"
+cat "${ENV_FILE}"
+echo "------------------------------"
+
+# Step 6: Deploy to Railway using the .env file
+echo -e "${BLUE}[6/8] Deploying to Railway with environment file...${NC}"
 git add .
-git commit -m "Railway deployment: Fully automated configuration" --allow-empty
-echo -e "${YELLOW}Initiating Railway deployment...${NC}"
-railway up --detach
+git commit -m "Railway deployment: Automated configuration" --allow-empty
+echo -e "${YELLOW}Initiating Railway deployment using variables from '${ENV_FILE}'...${NC}"
+railway up --detach --env-file "${ENV_FILE}"
 echo -e "${BLUE}Waiting for deployment to stabilize (90 seconds)...${NC}"
 sleep 90
 echo -e "${BLUE}Verifying deployment status...${NC}"
@@ -224,123 +173,65 @@ echo ""
 
 echo -e "${YELLOW}### PART 2: MIGRATING DATABASE FROM NEON TO RAILWAY ###${NC}"
 
-# Step 1: PostgreSQL tools verification
-echo -e "${BLUE}[1/5] Verifying PostgreSQL client tools...${NC}"
-if ! command -v pg_dump &> /dev/null || ! command -v psql &> /dev/null; then
-    echo -e "${RED}FATAL: PostgreSQL client tools not found. Please install them and re-run.${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ PostgreSQL client tools are available.${NC}"
-
-# Step 2: Neon database connection verification
-echo -e "${BLUE}[2/5] Verifying Neon database connection...${NC}"
-if ! psql "$NEON_DB_URL" -c "\q" >/dev/null 2>&1; then
-    echo -e "${RED}FATAL: Failed to connect to Neon database. Please check your NEON_DB_URL.${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Neon database connection successful.${NC}"
-
-# Step 3: Enhanced data export from Neon
-echo -e "${BLUE}[3/5] Exporting data from Neon database...${NC}"
+# Step 7: Database Migration
+echo -e "${BLUE}[7/8] Migrating data from Neon to Railway PostgreSQL...${NC}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 SCHEMA_FILE="neon_schema_${TIMESTAMP}.sql"
 DUMP_FILE="neon_export_${TIMESTAMP}.sql"
-
-echo -e "${YELLOW}Exporting database schema...${NC}"
-pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges --clean --if-exists > "$SCHEMA_FILE"
-
-echo -e "${YELLOW}Cleaning schema file for Railway compatibility...${NC}"
-sed -i.bak '/SET.*transaction_timeout/d' "$SCHEMA_FILE"
-sed -i.bak '/SET.*idle_in_transaction_session_timeout/d' "$SCHEMA_FILE"
-sed -i.bak '/SET.*lock_timeout/d' "$SCHEMA_FILE"
-echo -e "${GREEN}✓ Schema file cleaned.${NC}"
-
-echo -e "${YELLOW}Exporting database data...${NC}"
-pg_dump "$NEON_DB_URL" --data-only --no-owner --no-privileges --column-inserts > "$DUMP_FILE"
-echo -e "${GREEN}✓ Database export completed successfully.${NC}"
-
-# Step 4: Test Railway database connection
-echo -e "${BLUE}[4/5] Testing Railway database connection...${NC}"
-if ! psql "$RAILWAY_DB_URL" -c "\q" >/dev/null 2>&1; then
-    echo -e "${RED}FATAL: Failed to connect to Railway database using the provided URL.${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Railway database connection successful.${NC}"
-
-# Step 5: Import data to Railway with transaction safety
-echo -e "${BLUE}[5/5] Importing data to Railway database...${NC}"
-MIGRATION_SUCCESS=false
 IMPORT_LOG="railway_import_${TIMESTAMP}.log"
 IMPORT_SCRIPT="import_script_${TIMESTAMP}.sql"
 
-# *** FIX: Create a wrapper script to disable triggers for the data import ***
+echo -e "${YELLOW}Exporting schema and data from Neon...${NC}"
+pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges --clean --if-exists > "$SCHEMA_FILE"
+echo -e "${YELLOW}Cleaning schema file for Railway compatibility...${NC}"
+sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$SCHEMA_FILE"
+echo -e "${YELLOW}Exporting data from Neon...${NC}"
+pg_dump "$NEON_DB_URL" --data-only --no-owner --no-privileges --column-inserts > "$DUMP_FILE"
+
 echo -e "${YELLOW}Creating safe import script to handle circular dependencies...${NC}"
 cat > "$IMPORT_SCRIPT" <<EOF
--- Start Transaction
 BEGIN;
-
--- Import Schema
 \echo '--- Importing schema ---'
 \i ${SCHEMA_FILE}
-
--- Disable Triggers to allow out-of-order data insertion
-\echo '--- Disabling triggers for data import ---'
 SET session_replication_role = 'replica';
-
--- Import Data
 \echo '--- Importing data ---'
 \i ${DUMP_FILE}
-
--- Re-enable Triggers
-\echo '--- Re-enabling triggers ---'
 SET session_replication_role = 'origin';
-
--- End Transaction
 COMMIT;
 EOF
 echo -e "${GREEN}✓ Safe import script created.${NC}"
 
-echo -e "${YELLOW}Executing database import...${NC}"
-psql "$RAILWAY_DB_URL" --file="$IMPORT_SCRIPT" > "$IMPORT_LOG" 2>&1
+echo -e "${YELLOW}Executing database import on Railway...${NC}"
+psql "$RAILWAY_DB_URL" -v ON_ERROR_STOP=1 --file="$IMPORT_SCRIPT" > "$IMPORT_LOG" 2>&1 && MIGRATION_SUCCESS=true || MIGRATION_SUCCESS=false
 
-if [ $? -eq 0 ]; then
+if [ "$MIGRATION_SUCCESS" = true ]; then
     echo -e "${GREEN}✓ Database import completed successfully!${NC}"
-    MIGRATION_SUCCESS=true
 else
-    echo -e "${RED}Database import failed!${NC}"
-    echo -e "${YELLOW}Check the import log for details: ${IMPORT_LOG}${NC}"
+    echo -e "${RED}Database import failed! Check log for details: ${IMPORT_LOG}${NC}"
     tail -20 "$IMPORT_LOG"
 fi
 
-# Step 6: Cleanup and final instructions
-echo -e "${BLUE}--- Organizing backups and cleanup ---${NC}"
-
+# Step 8: Cleanup
+echo -e "${BLUE}[8/8] Organizing backups and cleanup...${NC}"
 BACKUP_DIR="./database_backups/migration_${TIMESTAMP}"
 mkdir -p "$BACKUP_DIR"
-mv "$SCHEMA_FILE" "$BACKUP_DIR/"
-mv "$DUMP_FILE" "$BACKUP_DIR/"
-mv "$IMPORT_SCRIPT" "$BACKUP_DIR/"
-mv ./*.bak "$BACKUP_DIR/" 2>/dev/null || true
-[ -f "$IMPORT_LOG" ] && mv "$IMPORT_LOG" "$BACKUP_DIR/"
-
-echo -e "${GREEN}✓ Backup saved to: ${BACKUP_DIR}${NC}"
-
+mv "$SCHEMA_FILE" "$DUMP_FILE" "$IMPORT_SCRIPT" "$IMPORT_LOG" "$ENV_FILE" ./*.bak "$PULLED_ENV_FILE" "$BACKUP_DIR/" 2>/dev/null || true
+rm -rf .vercel # remove directory created by vercel pull
+echo -e "${GREEN}✓ Backup and log saved to: ${BACKUP_DIR}${NC}"
 cd ./database_backups 2>/dev/null && ls -t | grep "migration_" | tail -n +6 | xargs rm -rf 2>/dev/null; cd ..
 
+# --- FINAL SUMMARY ---
 echo ""
 echo -e "${GREEN}🚀 === FULLY AUTOMATED DEPLOYMENT AND MIGRATION COMPLETE === 🚀${NC}"
 echo ""
-
+echo -e "${GREEN}✅ Application deployment initiated successfully on Railway.${NC}"
 if [ "$MIGRATION_SUCCESS" = true ]; then
-    echo -e "${GREEN}✅ Application deployed successfully to Railway${NC}"
-    echo -e "${GREEN}✅ Database migrated successfully from Neon to Railway${NC}"
+    echo -e "${GREEN}✅ Database migrated successfully from Neon to Railway.${NC}"
 else
-    echo -e "${GREEN}✅ Application deployed successfully to Railway${NC}"
     echo -e "${YELLOW}⚠️  Database migration encountered issues. Check the log in ${BACKUP_DIR}${NC}"
 fi
-
 echo -e "\n${YELLOW}📋 POST-DEPLOYMENT TASKS:${NC}\n"
-echo -e "${BLUE}1. Monitor Application Logs:${NC} railway logs --service ar-backend"
-echo -e "${BLUE}2. Monitor Database Logs:${NC} railway logs --service ${RAILWAY_DB_SERVICE_NAME}"
-echo -e "${BLUE}3. Verify Database Tables:${NC} railway run --service ${RAILWAY_DB_SERVICE_NAME} -- psql -c '\\dt+'"
+echo -e "${BLUE}1. Monitor Application Logs:${NC} railway logs -s ar-backend"
+echo -e "${BLUE}2. Monitor Database Logs:${NC} railway logs -s ${RAILWAY_DB_SERVICE_NAME}"
+echo -e "${BLUE}3. Verify Database Tables:${NC} railway run -s ${RAILWAY_DB_SERVICE_NAME} -- psql -c '\\dt+'"
 echo -e "${BLUE}4. Test Application Health:${NC} railway open\n"

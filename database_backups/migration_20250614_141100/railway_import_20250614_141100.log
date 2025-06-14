@@ -1,0 +1,232 @@
+BEGIN
+--- Importing schema ---
+SET
+SET
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+SET
+SET
+SET
+SET
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP TRIGGER
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP TABLE
+DROP SEQUENCE
+DROP SEQUENCE
+DROP TABLE
+DROP SEQUENCE
+DROP TABLE
+DROP TABLE
+DROP TABLE
+DROP SEQUENCE
+DROP TABLE
+DROP SEQUENCE
+DROP TABLE
+DROP SEQUENCE
+DROP TABLE
+DROP SEQUENCE
+DROP TABLE
+DROP SEQUENCE
+DROP TABLE
+DROP SEQUENCE
+DROP TABLE
+DROP TABLE
+DROP FUNCTION
+DROP FUNCTION
+DROP SCHEMA
+CREATE SCHEMA
+CREATE FUNCTION
+CREATE FUNCTION
+SET
+SET
+CREATE TABLE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+--- Disabling triggers for data import ---
+SET
+--- Importing data ---
+SET
+SET
+SET
+psql:neon_export_20250614_141100.sql:11: ERROR:  unrecognized configuration parameter "transaction_timeout"
+psql:neon_export_20250614_141100.sql:12: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:13: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:14: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:15: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:16: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:17: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:18: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:36: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:37: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:38: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:39: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:40: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:41: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:42: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:55: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:56: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:57: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:58: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:59: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:60: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:61: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:62: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:63: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:64: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:71: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:72: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:73: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:74: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:93: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:94: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:95: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:108: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:109: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:110: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:123: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:130: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:137: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:144: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:151: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:158: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:165: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:172: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:neon_export_20250614_141100.sql:179: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+--- Re-enabling triggers ---
+psql:import_script_20250614_141100.sql:18: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK
