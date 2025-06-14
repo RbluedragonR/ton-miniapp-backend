@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v10 - Final Fix) ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v11 - Final) ---${NC}"
 echo ""
 
 # --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
@@ -128,23 +128,28 @@ if [ ! -f "$PULLED_ENV_FILE" ]; then
 fi
 echo -e "${GREEN}✓ Successfully found pulled Vercel environment file at '${PULLED_ENV_FILE}'.${NC}"
 
-# *** FIX: Create a proper shell script with 'export' commands for reliability ***
 ENV_SCRIPT_FILE="env.sh"
 > "$ENV_SCRIPT_FILE" # Create a clean script file
 
 echo -e "${YELLOW}Writing Vercel variables to executable script '${ENV_SCRIPT_FILE}'...${NC}"
-while IFS='=' read -r key value || [[ -n "$key" ]]; do
+# *** FIX: More robust loop to parse the .env file format correctly ***
+while IFS= read -r line || [[ -n "$line" ]]; do
     # Skip empty lines and comments
-    if [[ -z "$key" ]] || [[ "$key" == \#* ]]; then continue; fi
+    if [[ -z "$line" ]] || [[ "$line" == \#* ]]; then continue; fi
 
-    # Skip old DB urls
-    if [[ "$key" == "POSTGRES_URL" ]] || [[ "$key" == "DATABASE_URL" ]] || [[ "$key" == smart_terminal* ]]; then
-        echo -e "- Skipping old var: ${key}"
+    # Split on the first '=' to handle values that contain '='
+    key=$(echo "$line" | cut -d'=' -f1)
+    value=$(echo "$line" | cut -d'=' -f2-)
+
+    # Skip old DB urls and Vercel-specific internal vars
+    if [[ "$key" == "POSTGRES_URL" ]] || [[ "$key" == "DATABASE_URL" ]] || [[ "$key" == smart_terminal* ]] || [[ "$key" == VERCEL* ]] || [[ "$key" == TURBO* ]] || [[ "$key" == NX_* ]]; then
+        echo -e "- Skipping internal/old var: ${key}"
         continue
     fi
 
-    # Write a proper export command, quoting the value
-    echo "export ${key}='${value}'" >> "$ENV_SCRIPT_FILE"
+    # Write a proper export command
+    echo "export ${key}=${value}" >> "$ENV_SCRIPT_FILE"
+    echo -e "- Writing export for ${GREEN}${key}${NC}"
 done < "$PULLED_ENV_FILE"
 echo -e "${GREEN}✓ Vercel environment variables prepared.${NC}"
 
