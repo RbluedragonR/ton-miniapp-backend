@@ -2,7 +2,7 @@
 
 const gameService = require('../services/gameService');
 const { Address } = require('@ton/core');
-const pool = require('../config/db'); // Required for crash history
+const pool = require('../config/database');  
 
 const isValidTonAddress = (addr) => {
     if (!addr) return false;

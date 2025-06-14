@@ -1,6 +1,6 @@
 // ar_backend/src/services/gameService.js
 
-const pool = require('../config/db');
+const pool = require('../config/database'); 
 const CrashGameEngine = require('./CrashGameEngine');
 const { ARIX_DECIMALS } = require('../utils/tonUtils');
 
