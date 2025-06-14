@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v11 - Final) ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v12 - The Real Final Fix) ---${NC}"
 echo ""
 
 # --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
@@ -28,7 +28,7 @@ echo -e "${YELLOW}### PART 1: PREPARING AND DEPLOYING APPLICATION ###${NC}"
 
 # Step 1: Tool Verification
 echo -e "${BLUE}[1/8] Verifying required tools...${NC}"
-for tool in railway vercel psql pg_dump; do
+for tool in railway vercel psql pg_dump grep sed; do
     if ! command -v $tool &> /dev/null; then
         echo -e "${RED}FATAL: Required tool '$tool' is not installed. Please install it and re-run.${NC}"
         exit 1
@@ -132,26 +132,11 @@ ENV_SCRIPT_FILE="env.sh"
 > "$ENV_SCRIPT_FILE" # Create a clean script file
 
 echo -e "${YELLOW}Writing Vercel variables to executable script '${ENV_SCRIPT_FILE}'...${NC}"
-# *** FIX: More robust loop to parse the .env file format correctly ***
-while IFS= read -r line || [[ -n "$line" ]]; do
-    # Skip empty lines and comments
-    if [[ -z "$line" ]] || [[ "$line" == \#* ]]; then continue; fi
-
-    # Split on the first '=' to handle values that contain '='
-    key=$(echo "$line" | cut -d'=' -f1)
-    value=$(echo "$line" | cut -d'=' -f2-)
-
-    # Skip old DB urls and Vercel-specific internal vars
-    if [[ "$key" == "POSTGRES_URL" ]] || [[ "$key" == "DATABASE_URL" ]] || [[ "$key" == smart_terminal* ]] || [[ "$key" == VERCEL* ]] || [[ "$key" == TURBO* ]] || [[ "$key" == NX_* ]]; then
-        echo -e "- Skipping internal/old var: ${key}"
-        continue
-    fi
-
-    # Write a proper export command
-    echo "export ${key}=${value}" >> "$ENV_SCRIPT_FILE"
-    echo -e "- Writing export for ${GREEN}${key}${NC}"
-done < "$PULLED_ENV_FILE"
+# *** FIX: Use a robust grep/sed command to filter and format the env file ***
+grep -vE '^#|^$|^(POSTGRES_URL|DATABASE_URL|smart_terminal.*|VERCEL.*|TURBO.*|NX_.*)=' "$PULLED_ENV_FILE" \
+| sed 's/^\(.*\)$/export \1/' > "$ENV_SCRIPT_FILE"
 echo -e "${GREEN}✓ Vercel environment variables prepared.${NC}"
+
 
 echo -e "${YELLOW}Adding Railway-specific variables to ${ENV_SCRIPT_FILE}...${NC}"
 echo "export DATABASE_URL='${RAILWAY_DB_URL}'" >> "$ENV_SCRIPT_FILE"
@@ -170,6 +155,7 @@ source "./${ENV_SCRIPT_FILE}"
 echo -e "${GREEN}✓ Variables sourced to environment.${NC}"
 
 echo -e "${YELLOW}--- VERIFYING EXPORTED ENVIRONMENT VARIABLES ---${NC}"
+# This time, the grep will find the variables from Vercel.
 printenv | grep -E 'ARIX|BACKEND|FRONTEND|DATABASE_URL|POSTGRES_URL|TELEGRAM|NODE_ENV' || echo -e "${RED}No relevant environment variables found to verify.${NC}"
 echo -e "${YELLOW}----------------------------------------------${NC}"
 echo -e "${BLUE}Please check the list above to confirm your variables were exported before deployment.${NC}"
