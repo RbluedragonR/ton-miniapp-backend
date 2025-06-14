@@ -2,116 +2,286 @@
 set -e
 
 # --- Configuration ---
-# Review and confirm these values before running.
 RAILWAY_PROJECT_NAME="ar-backend"
-RAILWAY_PROJECT_ID="42bb1cdd-7437-4092-82e1-93d44b5a1498" # Used for the initial link attempt
+RAILWAY_PROJECT_ID="42bb1cdd-7437-4092-82e1-93d44b5a1498"
 RAILWAY_DB_SERVICE_NAME="Postgres-cMD6"
 
-# Hardcoded URLs for full automation
 NEON_DB_URL="postgresql://neondb_owner:npg_0ngYqcX8vSQI@ep-proud-math-a4sxlwf8-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
 RAILWAY_DB_URL="postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway"
 
-# --- Colors for Output ---
+# --- Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v12 - Hardcoded ENV) ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Deployment Script (v16 - Final Schema Fix) ---${NC}"
 echo ""
 
-# --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
-
-echo -e "${YELLOW}### PART 1: PREPARING AND DEPLOYING APPLICATION ###${NC}"
+# --- PART 1: SETUP AND DEPLOYMENT ---
 
 # Step 1: Tool Verification
 echo -e "${BLUE}[1/7] Verifying required tools...${NC}"
 for tool in railway psql pg_dump; do
     if ! command -v $tool &> /dev/null; then
-        echo -e "${RED}FATAL: Required tool '$tool' is not installed. Please install it and re-run.${NC}"
+        echo -e "${RED}FATAL: Required tool '$tool' not installed.${NC}"
         exit 1
     fi
 done
 echo -e "${GREEN}✓ All required tools are available.${NC}"
 
-
-# Step 2: Automatically fixing project files
-echo -e "${BLUE}[2/7] Automatically fixing project files...${NC}"
-cat > package.json << 'EOF'
-{
-  "name": "ar_backend",
-  "version": "1.0.0",
-  "main": "src/server.js",
-  "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "migrate": "node-pg-migrate up"
-  },
-  "engines": {
-    "node": ">=20.x",
-    "npm": ">=10.x"
-  },
-  "dependencies": {
-    "@orbs-network/ton-access": "^2.3.3",
-    "@ton/core": "^0.56.3",
-    "@ton/crypto": "^3.2.0",
-    "@ton/ton": "^13.11.2",
-    "axios": "^1.7.7",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-rate-limit": "^7.4.0",
-    "helmet": "^7.1.0",
-    "morgan": "^1.10.0",
-    "node-pg-migrate": "^7.6.1",
-    "node-telegram-bot-api": "^0.66.0",
-    "pg": "^8.12.0",
-    "ws": "^8.18.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.4"
-  }
-}
-EOF
-echo -e "${GREEN}✓ package.json updated with stable versions.${NC}"
-
-# Step 3: Enhanced dependency management
-echo -e "${BLUE}[3/7] Setting up environment and installing dependencies...${NC}"
-echo "Performing clean dependency installation..."
-rm -rf node_modules package-lock.json
-npm cache clean --force 2>/dev/null || true
-npm install --no-audit --no-fund
-echo -e "${GREEN}✓ Production dependencies installed successfully.${NC}"
-
-# Step 4: Railway authentication and linking (with interactive fallback)
-echo -e "${BLUE}[4/7] Authenticating and linking with Railway...${NC}"
-if ! railway whoami &>/dev/null; then
-    echo -e "${YELLOW}Not logged in to Railway. Attempting login...${NC}"
-    railway login
-fi
-
+# Step 2: Railway Login & Linking
+echo -e "${BLUE}[2/7] Authenticating and linking with Railway...${NC}"
+if ! railway whoami &>/dev/null; then railway login; fi
 if [ ! -f "railway.json" ]; then
-    echo -e "${YELLOW}Project not linked. Attempting to link to project ID for '${RAILWAY_PROJECT_NAME}'...${NC}"
     if ! railway link "$RAILWAY_PROJECT_ID" 2>/dev/null; then
-        echo -e "${YELLOW}Direct link with Project ID failed (common with older CLI versions).${NC}"
-        echo -e "${YELLOW}Falling back to interactive linking. Please select your project below.${NC}"
-        if ! railway link; then
-            echo -e "${RED}FATAL: Interactive linking also failed. Cannot proceed.${NC}"
-            exit 1
-        fi
+        echo -e "${YELLOW}Direct link failed. Falling back to interactive linking...${NC}"
+        railway link
     fi
-    echo -e "${GREEN}✓ Successfully linked to project '${RAILWAY_PROJECT_NAME}'.${NC}"
-else
-    echo -e "${GREEN}✓ Project already linked to Railway.${NC}"
 fi
+echo -e "${GREEN}✓ Project linked.${NC}"
 
-# Step 5: Create environment script with hardcoded variables
-echo -e "${BLUE}[5/7] Creating environment script with hardcoded variables...${NC}"
+# Step 3: Create Correct Schema File with Drop statements
+echo -e "${BLUE}[3/7] Creating corrected local schema file with cleanup commands...${NC}"
+SCHEMA_FILE="001_corrected_schema.sql"
+cat > "$SCHEMA_FILE" << 'EOF'
+--
+-- PostgreSQL database schema
+--
+-- FIX: Drop existing tables to ensure a clean slate.
+DROP TABLE IF EXISTS announcements CASCADE;
+DROP TABLE IF EXISTS referral_rewards CASCADE;
+DROP TABLE IF EXISTS user_usdt_withdrawals CASCADE;
+DROP TABLE IF EXISTS user_arix_withdrawals CASCADE;
+DROP TABLE IF EXISTS user_task_completions CASCADE;
+DROP TABLE IF EXISTS tasks CASCADE;
+DROP TABLE IF EXISTS coinflip_history CASCADE;
+DROP TABLE IF EXISTS crash_rounds CASCADE;
+DROP TABLE IF EXISTS crash_games CASCADE;
+DROP TABLE IF EXISTS user_stakes CASCADE;
+DROP TABLE IF EXISTS staking_plans CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+
+-- Function to generate a random referral code
+CREATE OR REPLACE FUNCTION generate_referral_code()
+RETURNS VARCHAR AS $$
+DECLARE
+  chars TEXT[] := '{A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,0,1,2,3,4,5,6,7,8,9}';
+  result TEXT := '';
+  i INTEGER;
+BEGIN
+  FOR i IN 1..8 LOOP
+    result := result || chars[1+random()*(array_length(chars, 1)-1)];
+  END LOOP;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger function to set a referral code for new users
+CREATE OR REPLACE FUNCTION set_referral_code()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.referral_code IS NULL THEN
+    LOOP
+      NEW.referral_code := generate_referral_code();
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM users WHERE referral_code = NEW.referral_code);
+    END LOOP;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+    wallet_address VARCHAR(68) PRIMARY KEY,
+    telegram_id BIGINT UNIQUE,
+    username VARCHAR(255),
+    referral_code VARCHAR(10) UNIQUE,
+    referrer_wallet_address VARCHAR(68) REFERENCES users(wallet_address) ON DELETE SET NULL,
+    claimable_usdt_balance NUMERIC(20, 6) NOT NULL DEFAULT 0.00,
+    claimable_arix_rewards NUMERIC(20, 9) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_users_referrer ON users(referrer_wallet_address);
+CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
+
+-- Trigger for new user referral codes
+DROP TRIGGER IF EXISTS users_before_insert_set_referral_code ON users;
+CREATE TRIGGER users_before_insert_set_referral_code
+BEFORE INSERT ON users
+FOR EACH ROW
+EXECUTE FUNCTION set_referral_code();
+
+
+-- Staking Plans
+CREATE TABLE IF NOT EXISTS staking_plans (
+    plan_id SERIAL PRIMARY KEY,
+    plan_key VARCHAR(50) UNIQUE NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    duration_days INT NOT NULL,
+    fixed_usdt_apr_percent NUMERIC(5, 2) NOT NULL,
+    arix_early_unstake_penalty_percent NUMERIC(5, 2) NOT NULL,
+    min_stake_usdt NUMERIC(10, 2) DEFAULT 0,
+    max_stake_usdt NUMERIC(10, 2),
+    referral_l1_invest_percent NUMERIC(5, 2) DEFAULT 0,
+    referral_l2_invest_percent NUMERIC(5, 2) DEFAULT 0,
+    referral_l2_commission_on_l1_bonus_percent NUMERIC(5, 2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Stakes
+CREATE TABLE IF NOT EXISTS user_stakes (
+    stake_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_wallet_address VARCHAR(68) NOT NULL REFERENCES users(wallet_address),
+    staking_plan_id INT NOT NULL REFERENCES staking_plans(plan_id),
+    arix_amount_staked NUMERIC(20, 9) NOT NULL,
+    reference_usdt_value_at_stake_time NUMERIC(20, 6) NOT NULL,
+    stake_timestamp TIMESTAMPTZ NOT NULL,
+    unlock_timestamp TIMESTAMPTZ NOT NULL,
+    onchain_stake_tx_boc TEXT,
+    onchain_stake_tx_hash VARCHAR(64) UNIQUE,
+    status VARCHAR(30) NOT NULL DEFAULT 'pending_confirmation',
+    usdt_reward_accrued_total NUMERIC(20, 6) DEFAULT 0.00,
+    last_usdt_reward_calc_timestamp TIMESTAMPTZ,
+    arix_penalty_applied NUMERIC(20, 9) DEFAULT 0.00,
+    arix_final_reward_calculated NUMERIC(20, 9) DEFAULT 0.00,
+    onchain_unstake_tx_boc TEXT,
+    onchain_unstake_tx_hash VARCHAR(64) UNIQUE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_user_stakes_wallet_address ON user_stakes(user_wallet_address);
+CREATE INDEX IF NOT EXISTS idx_user_stakes_status ON user_stakes(status);
+
+
+-- *** FIX: Add missing 'hashed_server_seed' column to match application code ***
+CREATE TABLE IF NOT EXISTS crash_games (
+    id SERIAL PRIMARY KEY,
+    crash_multiplier NUMERIC(10, 2) NOT NULL,
+    server_seed VARCHAR(255),
+    public_hash VARCHAR(255),
+    hashed_server_seed VARCHAR(255), -- This was the missing column
+    status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- This table is kept to accept the data from the Neon dump without errors.
+CREATE TABLE IF NOT EXISTS crash_rounds (
+    id SERIAL PRIMARY KEY,
+    crash_multiplier NUMERIC(10, 2) NOT NULL,
+    server_seed VARCHAR(255),
+    public_hash VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- Coinflip History
+CREATE TABLE IF NOT EXISTS coinflip_history (
+    game_id SERIAL PRIMARY KEY,
+    user_wallet_address VARCHAR(68) NOT NULL REFERENCES users(wallet_address),
+    bet_amount_arix NUMERIC(20, 9) NOT NULL,
+    choice VARCHAR(10) NOT NULL,
+    server_coin_side VARCHAR(10) NOT NULL,
+    outcome VARCHAR(10) NOT NULL,
+    amount_delta_arix NUMERIC(20, 9) NOT NULL,
+    played_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_coinflip_history_user ON coinflip_history(user_wallet_address);
+
+
+-- Other tables from your schema... (tasks, rewards, etc.)
+CREATE TABLE IF NOT EXISTS tasks (
+    task_id SERIAL PRIMARY KEY,
+    task_key VARCHAR(50) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    reward_arix_amount NUMERIC(20, 9) DEFAULT 0,
+    task_type VARCHAR(50) DEFAULT 'social',
+    validation_type VARCHAR(50) DEFAULT 'manual',
+    action_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_repeatable BOOLEAN DEFAULT FALSE,
+    max_completions_user INT DEFAULT 1,
+    start_date TIMESTAMPTZ,
+    end_date TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_task_completions (
+    completion_id SERIAL PRIMARY KEY,
+    user_wallet_address VARCHAR(68) NOT NULL REFERENCES users(wallet_address),
+    task_id INT NOT NULL REFERENCES tasks(task_id),
+    status VARCHAR(30) NOT NULL DEFAULT 'pending_verification',
+    submission_data JSONB,
+    completed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    verified_at TIMESTAMPTZ,
+    reward_credited_at TIMESTAMPTZ,
+    notes TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_user_task_completions_user_task ON user_task_completions(user_wallet_address, task_id);
+CREATE INDEX IF NOT EXISTS idx_user_task_completions_status ON user_task_completions(status);
+
+-- Withdrawals tables
+CREATE TABLE IF NOT EXISTS user_arix_withdrawals (
+    withdrawal_id SERIAL PRIMARY KEY,
+    user_wallet_address character varying(68) NOT NULL,
+    amount_arix numeric(20,9) NOT NULL,
+    status character varying(20) DEFAULT 'pending_payout'::character varying NOT NULL,
+    onchain_tx_hash character varying(64) UNIQUE,
+    requested_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    processed_at timestamp with time zone
+);
+
+CREATE TABLE IF NOT EXISTS user_usdt_withdrawals (
+    withdrawal_id SERIAL PRIMARY KEY,
+    user_wallet_address character varying(68) NOT NULL,
+    amount_usdt numeric(20,6) NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    onchain_tx_hash character varying(64) UNIQUE,
+    notes text,
+    requested_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    processed_at timestamp with time zone
+);
+
+CREATE TABLE IF NOT EXISTS referral_rewards (
+    reward_id SERIAL PRIMARY KEY,
+    stake_id uuid,
+    referrer_wallet_address character varying(68) NOT NULL,
+    referred_wallet_address character varying(68) NOT NULL,
+    level integer NOT NULL,
+    reward_type character varying(50) NOT NULL,
+    reward_amount_usdt numeric(20,6) NOT NULL,
+    status character varying(20) DEFAULT 'credited'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS announcements (
+    announcement_id SERIAL PRIMARY KEY,
+    title character varying(255) NOT NULL,
+    content text NOT NULL,
+    type character varying(50) DEFAULT 'info'::character varying,
+    image_url text,
+    action_url text,
+    action_text character varying(100),
+    is_pinned boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    published_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    expires_at timestamp with time zone
+);
+EOF
+echo -e "${GREEN}✓ Corrected schema file created.${NC}"
+
+# Step 4: Create environment script with hardcoded variables
+echo -e "${BLUE}[4/7] Creating environment script...${NC}"
 ENV_SCRIPT_FILE="env.sh"
-> "$ENV_SCRIPT_FILE" # Create a clean script file
-
-echo -e "${YELLOW}Writing hardcoded variables to executable script '${ENV_SCRIPT_FILE}'...${NC}"
 cat > "$ENV_SCRIPT_FILE" << EOF
 export ARIX_TOKEN_MASTER_ADDRESS='EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd'
 export BACKEND_USDT_WALLET_ADDRESS='UQC7X42jH4O87Jpeo7kseX5HEXwEXKEm2S-FifEsjV2hgGpQ'
@@ -126,98 +296,44 @@ export DATABASE_URL='${RAILWAY_DB_URL}'
 export POSTGRES_URL='${RAILWAY_DB_URL}'
 export NODE_ENV='production'
 EOF
-echo -e "${GREEN}✓ Executable environment script '${ENV_SCRIPT_FILE}' is ready.${NC}"
+echo -e "${GREEN}✓ Environment script created.${NC}"
 
-# Step 6: Deploy to Railway by EXPORTING variables
-echo -e "${BLUE}[6/7] Deploying to Railway by exporting variables...${NC}"
-git add .
-git commit -m "Railway deployment: Automated configuration" --allow-empty
-
-echo -e "${YELLOW}Sourcing variables from '${ENV_SCRIPT_FILE}' to the current shell session...${NC}"
+# Step 5: Deploy Application
+echo -e "${BLUE}[5/7] Deploying application to Railway...${NC}"
 source "./${ENV_SCRIPT_FILE}"
-echo -e "${GREEN}✓ Variables sourced to environment.${NC}"
-
 echo -e "${YELLOW}--- VERIFYING EXPORTED ENVIRONMENT VARIABLES ---${NC}"
-printenv | grep -E 'ARIX|BACKEND|FRONTEND|DATABASE_URL|POSTGRES_URL|TELEGRAM|NODE_ENV|USDT|TON_NETWORK' || echo -e "${RED}No relevant environment variables found to verify.${NC}"
+printenv | grep -E 'ARIX|BACKEND|FRONTEND|DATABASE_URL|POSTGRES_URL|TELEGRAM|NODE_ENV|USDT|TON_NETWORK'
 echo -e "${YELLOW}----------------------------------------------${NC}"
-echo -e "${BLUE}Please check the list above to confirm your variables were exported before deployment.${NC}"
-
-echo -e "${YELLOW}Initiating Railway deployment...${NC}"
 railway up --detach
+echo -e "${GREEN}✓ Deployment initiated.${NC}"
 
-echo -e "${BLUE}Waiting for deployment to stabilize (90 seconds)...${NC}"
-sleep 90
-echo -e "${BLUE}Verifying deployment status...${NC}"
-railway status || echo -e "${YELLOW}Status check unavailable, continuing...${NC}"
-echo -e "${GREEN}### APPLICATION DEPLOYMENT COMPLETE ###${NC}"
-echo ""
+# Step 6: Apply Schema and Migrate Data
+echo -e "${BLUE}[6/7] Applying schema and migrating data...${NC}"
+echo "Waiting for deployment to stabilize (60 seconds)..."
+sleep 60
 
-# --- PART 2: DATABASE MIGRATION ---
+echo "Applying new schema (with cleanup) to Railway database..."
+psql "$RAILWAY_DB_URL" -v ON_ERROR_STOP=1 -f "$SCHEMA_FILE"
 
-echo -e "${YELLOW}### PART 2: MIGRATING DATABASE FROM NEON TO RAILWAY ###${NC}"
-
-# Step 7: Database Migration
-echo -e "${BLUE}[7/7] Migrating data from Neon to Railway PostgreSQL...${NC}"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SCHEMA_FILE="neon_schema_${TIMESTAMP}.sql"
-DUMP_FILE="neon_export_${TIMESTAMP}.sql"
-IMPORT_LOG="railway_import_${TIMESTAMP}.log"
-IMPORT_SCRIPT="import_script_${TIMESTAMP}.sql"
-
-echo -e "${YELLOW}Exporting schema and data from Neon...${NC}"
-pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges --clean --if-exists > "$SCHEMA_FILE"
+echo "Exporting data from Neon..."
+DUMP_FILE="neon_data_export.sql"
 pg_dump "$NEON_DB_URL" --data-only > "$DUMP_FILE"
 
-echo -e "${YELLOW}Cleaning schema and data files for Railway compatibility...${NC}"
-sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$SCHEMA_FILE"
-echo -e "${GREEN}✓ Schema file cleaned.${NC}"
+echo "Cleaning data dump file..."
 sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$DUMP_FILE"
-echo -e "${GREEN}✓ Data file cleaned.${NC}"
+sed -i.bak -e '/SELECT.*setval/d' "$DUMP_FILE"
 
-echo -e "${YELLOW}Creating safe import script to handle circular dependencies...${NC}"
-cat > "$IMPORT_SCRIPT" <<EOF
-BEGIN;
-\echo '--- Importing schema ---'
-\i ${SCHEMA_FILE}
-SET session_replication_role = 'replica';
-\echo '--- Importing data ---'
-\i ${DUMP_FILE}
-SET session_replication_role = 'origin';
-COMMIT;
-EOF
-echo -e "${GREEN}✓ Safe import script created.${NC}"
+echo "Importing data to Railway..."
+psql "$RAILWAY_DB_URL" -v ON_ERROR_STOP=1 -f "$DUMP_FILE"
 
-echo -e "${YELLOW}Executing database import on Railway...${NC}"
-psql "$RAILWAY_DB_URL" -v ON_ERROR_STOP=1 --file="$IMPORT_SCRIPT" > "$IMPORT_LOG" 2>&1 && MIGRATION_SUCCESS=true || MIGRATION_SUCCESS=false
+echo -e "${GREEN}✓ Database migration complete.${NC}"
 
-if [ "$MIGRATION_SUCCESS" = true ]; then
-    echo -e "${GREEN}✓ Database import completed successfully!${NC}"
-else
-    echo -e "${RED}Database import failed! Check log for details: ${IMPORT_LOG}${NC}"
-    tail -20 "$IMPORT_LOG"
-fi
-
-# Cleanup
-echo -e "${BLUE}--- Organizing backups and cleanup ---${NC}"
-BACKUP_DIR="./database_backups/migration_${TIMESTAMP}"
-mkdir -p "$BACKUP_DIR"
-mv "$SCHEMA_FILE" "$DUMP_FILE" "$IMPORT_SCRIPT" "$IMPORT_LOG" "$ENV_SCRIPT_FILE" ./*.bak 2>/dev/null || true
-rm -rf .vercel 2>/dev/null || true
-echo -e "${GREEN}✓ Backup and log saved to: ${BACKUP_DIR}${NC}"
-cd ./database_backups 2>/dev/null && ls -t | grep "migration_" | tail -n +7 | xargs rm -rf 2>/dev/null; cd ..
-
-# --- FINAL SUMMARY ---
+# Step 7: Final Redeploy and Cleanup
+echo -e "${BLUE}[7/7] Finalizing deployment...${NC}"
+railway redeploy
 echo ""
 echo -e "${GREEN}🚀 === FULLY AUTOMATED DEPLOYMENT AND MIGRATION COMPLETE === 🚀${NC}"
 echo ""
-echo -e "${GREEN}✅ Application deployment initiated successfully on Railway.${NC}"
-if [ "$MIGRATION_SUCCESS" = true ]; then
-    echo -e "${GREEN}✅ Database migrated successfully from Neon to Railway.${NC}"
-else
-    echo -e "${YELLOW}⚠️  Database migration encountered issues. Check the log in ${BACKUP_DIR}${NC}"
-fi
-echo -e "\n${YELLOW}📋 POST-DEPLOYMENT TASKS:${NC}\n"
-echo -e "${BLUE}1. Monitor Application Logs:${NC} railway logs -s ar-backend"
-echo -e "${BLUE}2. Monitor Database Logs:${NC} railway logs -s ${RAILWAY_DB_SERVICE_NAME}"
-echo -e "${BLUE}3. Verify Database Tables:${NC} railway run -s ${RAILWAY_DB_SERVICE_NAME} -- psql -c '\\dt+'"
-echo -e "${BLUE}4. Test Application Health:${NC} railway open\n"
+echo -e "${YELLOW}📋 POST-DEPLOYMENT TASKS:${NC}"
+echo -e "1. Monitor Application Logs: ${BLUE}railway logs -s ar-backend${NC}"
+echo -e "2. Test Application Health: ${BLUE}railway open${NC}"

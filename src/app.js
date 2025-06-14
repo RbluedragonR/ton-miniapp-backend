@@ -14,6 +14,15 @@ const { generalErrorHandler, notFoundHandler } = require('./middlewares/errorHan
 
 const app = express();
 
+// --- REVISION START: TRUST PROXY SETTING ---
+// This is the critical fix for deploying on a platform like Railway which uses a reverse proxy.
+// It tells Express to trust the X-Forwarded-For header sent by the proxy,
+// allowing express-rate-limit and other middleware to correctly identify the client's IP address.
+// This resolves the 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR' error.
+app.set('trust proxy', 1);
+// --- REVISION END ---
+
+
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false
@@ -29,7 +38,7 @@ const corsOptions = {
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
         if (origin.includes('web.telegram.org')) return callback(null, true);
-        if (origin.includes('railway.app')) return callback(null, true);
+        if (origin.includes('railway.app')) return callback(null, true); // For Railway's internal checks/health pings
         if (corsOrigins.some(allowedOrigin => origin && origin.includes(allowedOrigin))) {
             return callback(null, true);
         }

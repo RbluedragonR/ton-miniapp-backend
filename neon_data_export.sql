@@ -6,9 +6,6 @@
 -- Dumped by pg_dump version 17.5
 
 SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -144,63 +141,54 @@ COPY public.user_usdt_withdrawals (withdrawal_id, user_wallet_address, amount_us
 -- Name: announcements_announcement_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.announcements_announcement_id_seq', 1, false);
 
 
 --
 -- Name: coinflip_history_game_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.coinflip_history_game_id_seq', 1, false);
 
 
 --
 -- Name: crash_rounds_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.crash_rounds_id_seq', 10, true);
 
 
 --
 -- Name: referral_rewards_reward_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.referral_rewards_reward_id_seq', 1, false);
 
 
 --
 -- Name: staking_plans_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.staking_plans_plan_id_seq', 4, true);
 
 
 --
 -- Name: tasks_task_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.tasks_task_id_seq', 3, true);
 
 
 --
 -- Name: user_task_completions_completion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.user_task_completions_completion_id_seq', 4, true);
 
 
 --
 -- Name: user_usdt_withdrawals_withdrawal_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.user_usdt_withdrawals_withdrawal_id_seq', 1, false);
 
 
 --
 -- Name: user_usdt_withdrawals_withdrawal_id_seq1; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
 --
 
-SELECT pg_catalog.setval('public.user_usdt_withdrawals_withdrawal_id_seq1', 1, false);
 
 
 --

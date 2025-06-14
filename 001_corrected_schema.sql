@@ -1,6 +1,20 @@
 --
 -- PostgreSQL database schema
 --
+-- FIX: Drop existing tables to ensure a clean slate.
+DROP TABLE IF EXISTS announcements CASCADE;
+DROP TABLE IF EXISTS referral_rewards CASCADE;
+DROP TABLE IF EXISTS user_usdt_withdrawals CASCADE;
+DROP TABLE IF EXISTS user_arix_withdrawals CASCADE;
+DROP TABLE IF EXISTS user_task_completions CASCADE;
+DROP TABLE IF EXISTS tasks CASCADE;
+DROP TABLE IF EXISTS coinflip_history CASCADE;
+DROP TABLE IF EXISTS crash_rounds CASCADE;
+DROP TABLE IF EXISTS crash_games CASCADE;
+DROP TABLE IF EXISTS user_stakes CASCADE;
+DROP TABLE IF EXISTS staking_plans CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 
 -- Function to generate a random referral code
 CREATE OR REPLACE FUNCTION generate_referral_code()
@@ -97,17 +111,19 @@ CREATE INDEX IF NOT EXISTS idx_user_stakes_wallet_address ON user_stakes(user_wa
 CREATE INDEX IF NOT EXISTS idx_user_stakes_status ON user_stakes(status);
 
 
--- *** FIX: Ensuring both crash_games (used by app) and crash_rounds (from dump) can exist ***
+-- *** FIX: Add missing 'hashed_server_seed' column to match application code ***
 CREATE TABLE IF NOT EXISTS crash_games (
     id SERIAL PRIMARY KEY,
     crash_multiplier NUMERIC(10, 2) NOT NULL,
     server_seed VARCHAR(255),
     public_hash VARCHAR(255),
+    hashed_server_seed VARCHAR(255), -- This was the missing column
     status VARCHAR(20) NOT NULL DEFAULT 'waiting',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- This table is kept to accept the data from the Neon dump without errors.
 CREATE TABLE IF NOT EXISTS crash_rounds (
     id SERIAL PRIMARY KEY,
     crash_multiplier NUMERIC(10, 2) NOT NULL,
@@ -134,8 +150,6 @@ CREATE INDEX IF NOT EXISTS idx_coinflip_history_user ON coinflip_history(user_wa
 
 
 -- Other tables from your schema... (tasks, rewards, etc.)
--- Ensure these are also present in your migration file.
-
 CREATE TABLE IF NOT EXISTS tasks (
     task_id SERIAL PRIMARY KEY,
     task_key VARCHAR(50) UNIQUE NOT NULL,

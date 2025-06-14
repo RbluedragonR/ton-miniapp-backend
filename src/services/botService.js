@@ -13,7 +13,7 @@ const initBot = (app) => {
 
     // Use a webhook in production for efficiency
     if (process.env.NODE_ENV === 'production') {
-        const webhookUrl = `https://${process.env.RAILWAY_STATIC_URL || 'your-app-name.up.railway.app'}/telegram-webhook-${TELEGRAM_BOT_TOKEN.substring(0, 10)}`;
+        const webhookUrl = `https://${process.env.RAILWAY_STATIC_URL || 'https://ar-backend-production-34eb.up.railway.app'}/telegram-webhook-${TELEGRAM_BOT_TOKEN.substring(0, 10)}`;
         bot.setWebHook(webhookUrl);
         
         app.post(`/telegram-webhook-${TELEGRAM_BOT_TOKEN.substring(0, 10)}`, (req, res) => {
