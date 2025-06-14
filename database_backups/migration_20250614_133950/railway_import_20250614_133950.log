@@ -1,0 +1,18 @@
+BEGIN;
+psql:railway_import_script.sql:5: WARNING:  there is already a transaction in progress
+BEGIN
+SET session_replication_role = replica;
+SET
+SET client_min_messages = WARNING;
+SET
+SET log_min_messages = WARNING;
+SET
+Importing database schema...
+SET statement_timeout = 0;
+SET
+SET lock_timeout = 0;
+SET
+SET idle_in_transaction_session_timeout = 0;
+SET
+SET transaction_timeout = 0;
+psql:neon_schema_20250614_133950.sql:13: ERROR:  unrecognized configuration parameter "transaction_timeout"
