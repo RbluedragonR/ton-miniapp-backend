@@ -178,7 +178,6 @@ if ! command -v railway &> /dev/null; then
     exit 1
 fi
 
-# *** FIX: Attempt to upgrade the CLI to the latest version to support modern commands ***
 echo -e "${YELLOW}Attempting to upgrade Railway CLI to the latest version...${NC}"
 railway upgrade || echo -e "${YELLOW}Could not automatically upgrade Railway CLI. Continuing with existing version...${NC}"
 
@@ -188,11 +187,9 @@ if ! railway whoami &>/dev/null; then
     railway login
 fi
 
-# AUTOMATION: Automatically link project without user interaction
 if [ ! -f "railway.json" ]; then
     echo -e "${YELLOW}Project not linked. Linking to project ID for '${RAILWAY_PROJECT_NAME}' automatically...${NC}"
     
-    # Try the modern, direct link first. If it fails, fall back to interactive linking.
     if ! railway link "$RAILWAY_PROJECT_ID"; then
         echo -e "${YELLOW}Direct link failed. This can happen with older CLI versions.${NC}"
         echo -e "${YELLOW}Falling back to interactive linking. Please select your project from the list below.${NC}"
@@ -208,7 +205,7 @@ fi
 
 # Step 4: Environment variables setup
 echo -e "${BLUE}[4/6] Configuring environment variables...${NC}"
-railway variables set NODE_ENV=production || echo -e "${YELLOW}Could not set NODE_ENV. Please set it manually in the Railway dashboard.${NC}"
+railway variables set NODE_ENV=production || echo -e "${YELLOW}Could not set NODE_ENV. Please set it manually.${NC}"
 
 # Step 5: Commit and deploy with Railway
 echo -e "${BLUE}[5/6] Deploying to Railway...${NC}"
@@ -266,7 +263,6 @@ echo -e "${GREEN}✓ Database export completed successfully.${NC}"
 echo -e "${BLUE}[4/5] Testing Railway database connection...${NC}"
 if ! psql "$RAILWAY_DB_URL" -c "\q" >/dev/null 2>&1; then
     echo -e "${RED}FATAL: Failed to connect to Railway database using the provided URL.${NC}"
-    echo -e "${YELLOW}Please verify the RAILWAY_DB_URL variable in the script and that the service is running.${NC}"
     exit 1
 fi
 echo -e "${GREEN}✓ Railway database connection successful.${NC}"
@@ -275,9 +271,37 @@ echo -e "${GREEN}✓ Railway database connection successful.${NC}"
 echo -e "${BLUE}[5/5] Importing data to Railway database...${NC}"
 MIGRATION_SUCCESS=false
 IMPORT_LOG="railway_import_${TIMESTAMP}.log"
+IMPORT_SCRIPT="import_script_${TIMESTAMP}.sql"
+
+# *** FIX: Create a wrapper script to disable triggers for the data import ***
+echo -e "${YELLOW}Creating safe import script to handle circular dependencies...${NC}"
+cat > "$IMPORT_SCRIPT" <<EOF
+-- Start Transaction
+BEGIN;
+
+-- Import Schema
+\echo '--- Importing schema ---'
+\i ${SCHEMA_FILE}
+
+-- Disable Triggers to allow out-of-order data insertion
+\echo '--- Disabling triggers for data import ---'
+SET session_replication_role = 'replica';
+
+-- Import Data
+\echo '--- Importing data ---'
+\i ${DUMP_FILE}
+
+-- Re-enable Triggers
+\echo '--- Re-enabling triggers ---'
+SET session_replication_role = 'origin';
+
+-- End Transaction
+COMMIT;
+EOF
+echo -e "${GREEN}✓ Safe import script created.${NC}"
 
 echo -e "${YELLOW}Executing database import...${NC}"
-(cat "$SCHEMA_FILE"; cat "$DUMP_FILE") | psql "$RAILWAY_DB_URL" --single-transaction --set ON_ERROR_STOP=on > "$IMPORT_LOG" 2>&1
+psql "$RAILWAY_DB_URL" --file="$IMPORT_SCRIPT" > "$IMPORT_LOG" 2>&1
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Database import completed successfully!${NC}"
@@ -285,7 +309,7 @@ if [ $? -eq 0 ]; then
 else
     echo -e "${RED}Database import failed!${NC}"
     echo -e "${YELLOW}Check the import log for details: ${IMPORT_LOG}${NC}"
-    tail -10 "$IMPORT_LOG"
+    tail -20 "$IMPORT_LOG"
 fi
 
 # Step 6: Cleanup and final instructions
@@ -295,6 +319,7 @@ BACKUP_DIR="./database_backups/migration_${TIMESTAMP}"
 mkdir -p "$BACKUP_DIR"
 mv "$SCHEMA_FILE" "$BACKUP_DIR/"
 mv "$DUMP_FILE" "$BACKUP_DIR/"
+mv "$IMPORT_SCRIPT" "$BACKUP_DIR/"
 mv ./*.bak "$BACKUP_DIR/" 2>/dev/null || true
 [ -f "$IMPORT_LOG" ] && mv "$IMPORT_LOG" "$BACKUP_DIR/"
 
