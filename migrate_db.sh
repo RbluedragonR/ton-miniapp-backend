@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v8 - Final) ---${NC}"
+echo -e "${BLUE}--- ARIX Terminal Fully Automated Railway Migration Script (v9 - with ENV verification) ---${NC}"
 echo ""
 
 # --- PART 1: PREPARING AND DEPLOYING APPLICATION ---
@@ -158,7 +158,14 @@ echo -e "${YELLOW}Exporting variables to the current shell session...${NC}"
 set -a # Automatically export all variables defined from now on
 source "${ENV_FILE}"
 set +a # Stop automatically exporting
-echo -e "${GREEN}✓ Variables exported to environment. The 'railway up' command will now inherit them.${NC}"
+echo -e "${GREEN}✓ Variables sourced to environment.${NC}"
+
+# *** NEW: Verification Step - Log the relevant variables to the terminal ***
+echo -e "${YELLOW}--- VERIFYING EXPORTED ENVIRONMENT VARIABLES ---${NC}"
+printenv | grep -E 'ARIX|BACKEND|FRONTEND|DATABASE_URL|POSTGRES_URL|TELEGRAM|NODE_ENV' || echo -e "${RED}No relevant environment variables found to verify.${NC}"
+echo -e "${YELLOW}----------------------------------------------${NC}"
+echo -e "${BLUE}Please check the list above to confirm your variables were exported before deployment.${NC}"
+
 
 echo -e "${YELLOW}Initiating Railway deployment...${NC}"
 railway up --detach
@@ -190,7 +197,7 @@ echo -e "${YELLOW}Cleaning schema and data files for Railway compatibility...${N
 # Clean the SCHEMA file
 sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$SCHEMA_FILE"
 echo -e "${GREEN}✓ Schema file cleaned.${NC}"
-# *** FIX: Clean the DATA file as well, as pg_dump adds these settings to both ***
+# Clean the DATA file
 sed -i.bak -e '/SET.*transaction_timeout/d' -e '/SET.*idle_in_transaction_session_timeout/d' -e '/SET.*lock_timeout/d' "$DUMP_FILE"
 echo -e "${GREEN}✓ Data file cleaned.${NC}"
 
