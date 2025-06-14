@@ -2,6 +2,9 @@
 set -e
 
 # --- Configuration ---
+# IMPORTANT: Find this in your Railway project dashboard. It's the name of your PostgreSQL service.
+RAILWAY_DB_SERVICE_NAME="Postgres-cMD6" # <-- REPLACE "postgresql" with your actual database service name on Railway
+
 NEON_DB_URL="postgresql://neondb_owner:npg_0ngYqcX8vSQI@ep-proud-math-a4sxlwf8-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
 RAILWAY_PROJECT_NAME="ar-backend"
 
@@ -23,6 +26,7 @@ echo -e "${YELLOW}### PART 1: PREPARING AND DEPLOYING APPLICATION ###${NC}"
 echo -e "${BLUE}[1/5] Automatically fixing project files...${NC}"
 
 # Automatically create a guaranteed-correct package.json file
+# FIX: Moved 'morgan' from devDependencies to dependencies
 cat > package.json << 'EOF'
 {
   "name": "ar_backend",
@@ -47,13 +51,13 @@ cat > package.json << 'EOF'
     "express": "^4.18.2",
     "express-rate-limit": "^7.2.0",
     "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
     "node-pg-migrate": "^7.4.0",
     "node-telegram-bot-api": "^0.65.1",
     "pg": "^8.11.5",
     "ws": "^8.17.0"
   },
   "devDependencies": {
-    "morgan": "^1.10.0",
     "nodemon": "^3.1.0"
   }
 }
@@ -126,6 +130,7 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
 else
     echo -e "${YELLOW}NVM not found, installing...${NC}"
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
     source "$NVM_DIR/nvm.sh"
 fi
 nvm use 18 || nvm install 18
@@ -151,9 +156,13 @@ fi
 # Step 4: Commit and Deploy
 echo -e "${BLUE}[4/5] Committing all fixes and deploying to Railway...${NC}"
 git add .
-git commit -m "Automated deployment: Rebuild core files" --allow-empty
+git commit -m "Automated deployment: Fix dependencies and rebuild core files" --allow-empty
 echo -e "${YELLOW}Deploying application. This will wait for the build to complete and show live logs...${NC}"
-railway up
+railway up --detach # Use --detach to not block the script
+
+# Wait for deployment to stabilize
+echo -e "${BLUE}Waiting for 30 seconds for the deployment to settle...${NC}"
+sleep 30
 
 # Step 5: Set Environment Variables
 echo -e "${BLUE}[5/5] Setting Production Environment Variables...${NC}"
@@ -167,21 +176,24 @@ echo ""
 echo -e "${YELLOW}### PART 2: MIGRATING DATA FROM NEON TO RAILWAY ###${NC}"
 
 # Step 1: Update Local PostgreSQL Tools
-echo -e "${BLUE}[1/3] Updating local PostgreSQL tools...${NC}"
-brew update > /dev/null
-brew upgrade libpq > /dev/null
-PG_DUMP_PATH=$(brew --prefix libpq)/bin/pg_dump
-echo -e "${GREEN}PostgreSQL tools are up to date.${NC}"
+echo -e "${BLUE}[1/3] Checking for local PostgreSQL tools...${NC}"
+if ! command -v pg_dump &> /dev/null; then
+    echo -e "${RED}Error: pg_dump command not found.${NC}"
+    echo -e "${YELLOW}Please install PostgreSQL client tools locally. On macOS with Homebrew, run: 'brew install libpq'${NC}"
+    exit 1
+fi
+echo -e "${GREEN}PostgreSQL tools are available.${NC}"
 
 # Step 2: Export from Neon
 DUMP_FILE="neon_dump.sql"
 echo -e "${BLUE}[2/3] Exporting data from Neon...${NC}"
-"$PG_DUMP_PATH" "$NEON_DB_URL" --clean --no-owner --no-privileges > "$DUMP_FILE"
-echo -e "${GREEN}Successfully exported data from Neon.${NC}"
+pg_dump "$NEON_DB_URL" --clean --no-owner --no-privileges > "$DUMP_FILE"
+echo -e "${GREEN}Successfully exported data from Neon to ${DUMP_FILE}.${NC}"
 
 # Step 3: Import to Railway
 echo -e "${BLUE}[3/3] Importing data into Railway PostgreSQL database...${NC}"
-railway run --service "${RAILWAY_PROJECT_NAME}" -- psql < "$DUMP_FILE"
+# FIX: Using the specific DB service name for the import command
+railway run --service "${RAILWAY_DB_SERVICE_NAME}" psql < "$DUMP_FILE"
 echo -e "${GREEN}Successfully imported data into Railway.${NC}"
 
 # --- Cleanup and Final Instructions ---
@@ -193,4 +205,3 @@ echo ""
 echo -e "${YELLOW}IMPORTANT: Add your other secrets (CORS_WHITELIST, TELEGRAM_BOT_TOKEN, etc.) in the Railway Dashboard.${NC}"
 echo ""
 railway open
-
