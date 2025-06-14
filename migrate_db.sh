@@ -3,8 +3,9 @@ set -e
 
 # --- Configuration ---
 # IMPORTANT: Find this in your Railway project dashboard. It's the name of your PostgreSQL service.
-RAILWAY_DB_SERVICE_NAME="Postgres-cMD6" # <-- REPLACE "postgresql" with your actual database service name on Railway
+RAILWAY_DB_SERVICE_NAME="Postgres-cMD6" # <-- REPLACE with your actual database service name on Railway
 
+# UPDATE: Use the correct Neon connection string from your Vercel dashboard
 NEON_DB_URL="postgresql://neondb_owner:npg_0ngYqcX8vSQI@ep-proud-math-a4sxlwf8-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
 RAILWAY_PROJECT_NAME="ar-backend"
 
@@ -182,7 +183,7 @@ echo -e "${BLUE}[4/6] Setting Production Environment Variables...${NC}"
 
 # Set NODE_ENV using the correct Railway CLI syntax
 echo -e "${YELLOW}Setting NODE_ENV to production...${NC}"
-railway variables set NODE_ENV=production || echo -e "${YELLOW}Manual step required: Set NODE_ENV=production in Railway dashboard${NC}"
+railway variables set NODE_ENV production || echo -e "${YELLOW}Manual step required: Set NODE_ENV=production in Railway dashboard${NC}"
 
 # Step 5: Commit and Deploy
 echo -e "${BLUE}[5/6] Committing all fixes and deploying to Railway...${NC}"
@@ -208,7 +209,7 @@ echo ""
 echo -e "${YELLOW}### PART 2: MIGRATING DATA FROM NEON TO RAILWAY ###${NC}"
 
 # Step 1: Ensure PostgreSQL Tools are Available
-echo -e "${BLUE}[1/4] Checking for local PostgreSQL tools...${NC}"
+echo -e "${BLUE}[1/5] Checking for local PostgreSQL tools...${NC}"
 if ! command -v pg_dump &> /dev/null; then
     echo -e "${RED}Error: pg_dump command not found.${NC}"
     echo -e "${YELLOW}Installing PostgreSQL client tools...${NC}"
@@ -249,19 +250,51 @@ if ! command -v pg_dump &> /dev/null; then
 fi
 echo -e "${GREEN}PostgreSQL tools are available.${NC}"
 
-# Step 2: Export from Neon with Better Error Handling
-DUMP_FILE="neon_dump_$(date +%Y%m%d_%H%M%S).sql"
-echo -e "${BLUE}[2/4] Exporting data from Neon...${NC}"
+# Step 2: Verify Neon Database Connection
+echo -e "${BLUE}[2/5] Verifying Neon database connection...${NC}"
 
-# Test connection first with better error reporting
+# Enhanced connection test with better error reporting
 echo -e "${YELLOW}Testing connection to Neon database...${NC}"
-if ! timeout 30 pg_dump "$NEON_DB_URL" --schema-only --no-owner --no-privileges > /dev/null 2>&1; then
-    echo -e "${RED}Failed to connect to Neon database. Please check:${NC}"
+CONNECTION_TEST=$(psql "$NEON_DB_URL" -c "SELECT 1 as test;" 2>&1)
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ Successfully connected to Neon database${NC}"
+    
+    # Get database info
+    echo -e "${BLUE}Gathering database information...${NC}"
+    TABLE_COUNT=$(psql "$NEON_DB_URL" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs)
+    echo -e "${GREEN}Found ${TABLE_COUNT} tables in the database${NC}"
+    
+    # List tables
+    echo -e "${BLUE}Available tables:${NC}"
+    psql "$NEON_DB_URL" -c "\dt" 2>/dev/null || echo -e "${YELLOW}Could not list tables${NC}"
+else
+    echo -e "${RED}Failed to connect to Neon database.${NC}"
+    echo -e "${YELLOW}Connection error details:${NC}"
+    echo "$CONNECTION_TEST"
+    echo -e "${YELLOW}Please check:${NC}"
     echo -e "${YELLOW}1. Your Neon database URL is correct${NC}"
-    echo -e "${YELLOW}2. Your Neon database is running${NC}"
+    echo -e "${YELLOW}2. Your Neon database is running and accessible${NC}"
     echo -e "${YELLOW}3. Your network connection is stable${NC}"
-    exit 1
+    echo -e "${YELLOW}4. SSL certificate issues (try adding sslmode=require to the URL)${NC}"
+    
+    read -p "Continue with manual connection string? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${RED}Exiting due to connection failure.${NC}"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}Please enter your Neon database URL:${NC}"
+    read -r NEON_DB_URL
+    if [ -z "$NEON_DB_URL" ]; then
+        echo -e "${RED}No URL provided. Exiting.${NC}"
+        exit 1
+    fi
 fi
+
+# Step 3: Export from Neon with Better Error Handling
+DUMP_FILE="neon_dump_$(date +%Y%m%d_%H%M%S).sql"
+echo -e "${BLUE}[3/5] Exporting data from Neon...${NC}"
 
 # Export full database with better options
 echo -e "${YELLOW}Exporting full database...${NC}"
@@ -278,155 +311,140 @@ pg_dump "$NEON_DB_URL" \
 if [ $? -eq 0 ] && [ -s "$DUMP_FILE" ]; then
     echo -e "${GREEN}Successfully exported data from Neon to ${DUMP_FILE}.${NC}"
     echo -e "${BLUE}Dump file size: $(du -h "$DUMP_FILE" | cut -f1)${NC}"
+    
+    # Show a preview of the dump file
+    echo -e "${BLUE}Preview of dump file (first 10 lines):${NC}"
+    head -10 "$DUMP_FILE"
+    echo "..."
 else
     echo -e "${RED}Failed to export data from Neon or dump file is empty.${NC}"
     exit 1
 fi
 
-# Step 3: Import to Railway with Improved Methods
-echo -e "${BLUE}[3/4] Importing data into Railway PostgreSQL database...${NC}"
+# Step 4: Get Railway Database Connection
+echo -e "${BLUE}[4/5] Getting Railway database connection...${NC}"
 
-# Initialize success flag
-IMPORT_SUCCESS=false
+# Try to get Railway database URL
+echo -e "${YELLOW}Retrieving Railway database connection string...${NC}"
+RAILWAY_DB_URL=""
 
-# First, verify Railway database service exists
-echo -e "${YELLOW}Verifying Railway database service '${RAILWAY_DB_SERVICE_NAME}'...${NC}"
-if ! railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- echo "Service accessible" &>/dev/null; then
-    echo -e "${RED}Cannot access Railway service '${RAILWAY_DB_SERVICE_NAME}'. Please check:${NC}"
-    echo -e "${YELLOW}1. Service name is correct in your Railway dashboard${NC}"
-    echo -e "${YELLOW}2. You have proper access permissions${NC}"
-    echo -e "${YELLOW}3. The service is running${NC}"
-    
-    echo -e "${BLUE}Available services:${NC}"
-    railway service list 2>/dev/null || echo -e "${YELLOW}Could not list services${NC}"
-    
-    # Don't exit, continue with manual instructions
-else
-    echo -e "${GREEN}Railway service is accessible.${NC}"
-    
-    # Method 1: Simple file transfer and import
-    echo -e "${YELLOW}🔄 Method 1: File transfer and SQL import${NC}"
-    
-    TEMP_DUMP_NAME="temp_import_$(date +%s).sql"
-    
-    # Copy file to Railway temp directory
-    echo -e "${BLUE}   Transferring dump file to Railway...${NC}"
-    if cat "$DUMP_FILE" | railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "cat > /tmp/${TEMP_DUMP_NAME}" 2>/dev/null; then
-        echo -e "${GREEN}   ✓ File transferred successfully${NC}"
-        
-        # Import with better error handling
-        echo -e "${BLUE}   Importing data into PostgreSQL...${NC}"
-        IMPORT_SCRIPT="
-        set -e
-        echo 'Starting database import...'
-        echo 'Database URL status:' \$([ -n \"\$DATABASE_URL\" ] && echo 'Available' || echo 'Missing')
-        
-        if [ -z \"\$DATABASE_URL\" ]; then
-            echo 'ERROR: DATABASE_URL not set'
-            exit 1
-        fi
-        
-        # Test connection
-        if ! psql \"\$DATABASE_URL\" -c 'SELECT 1;' >/dev/null 2>&1; then
-            echo 'ERROR: Cannot connect to database'
-            exit 1
-        fi
-        
-        # Import with transaction safety
-        echo 'Importing SQL dump...'
-        psql \"\$DATABASE_URL\" \
-            --quiet \
-            --no-psqlrc \
-            --single-transaction \
-            --set ON_ERROR_STOP=on \
-            -f /tmp/${TEMP_DUMP_NAME}
-        
-        # Clean up
-        rm -f /tmp/${TEMP_DUMP_NAME}
-        echo 'Import completed successfully!'
-        "
-        
-        if railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "$IMPORT_SCRIPT" 2>/dev/null; then
-            echo -e "${GREEN}   ✓ Method 1 SUCCESSFUL: Database imported!${NC}"
-            IMPORT_SUCCESS=true
-        else
-            echo -e "${RED}   ✗ Method 1 failed at import step${NC}"
-            # Clean up failed import file
-            railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "rm -f /tmp/${TEMP_DUMP_NAME}" 2>/dev/null || true
-        fi
+# Method 1: Try to get from Railway environment
+if RAILWAY_DB_URL=$(railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c 'echo $DATABASE_URL' 2>/dev/null); then
+    if [ -n "$RAILWAY_DB_URL" ] && [[ "$RAILWAY_DB_URL" =~ ^postgresql:// ]]; then
+        echo -e "${GREEN}✓ Retrieved Railway database URL from environment${NC}"
     else
-        echo -e "${RED}   ✗ Method 1 failed at file transfer step${NC}"
+        RAILWAY_DB_URL=""
     fi
+fi
+
+# Method 2: Try alternative environment variable names
+if [ -z "$RAILWAY_DB_URL" ]; then
+    for VAR_NAME in DATABASE_URL POSTGRES_URL DB_URL; do
+        if TEMP_URL=$(railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "echo \$${VAR_NAME}" 2>/dev/null); then
+            if [ -n "$TEMP_URL" ] && [[ "$TEMP_URL" =~ ^postgresql:// ]]; then
+                RAILWAY_DB_URL="$TEMP_URL"
+                echo -e "${GREEN}✓ Retrieved Railway database URL from ${VAR_NAME}${NC}"
+                break
+            fi
+        fi
+    done
+fi
+
+# Method 3: Manual input if automatic methods fail
+if [ -z "$RAILWAY_DB_URL" ]; then
+    echo -e "${YELLOW}Could not automatically retrieve Railway database URL.${NC}"
+    echo -e "${BLUE}Please get the database URL from your Railway dashboard:${NC}"
+    echo "1. Go to your Railway project dashboard"
+    echo "2. Click on your PostgreSQL service (${RAILWAY_DB_SERVICE_NAME})"
+    echo "3. Go to 'Connect' tab"
+    echo "4. Copy the 'Postgres Connection URL'"
+    echo ""
+    echo -e "${YELLOW}Enter your Railway PostgreSQL connection URL:${NC}"
+    read -r RAILWAY_DB_URL
     
-    # Method 2: Direct pipe import (if Method 1 failed)
-    if [ "$IMPORT_SUCCESS" = false ]; then
-        echo -e "${YELLOW}🔄 Method 2: Direct pipe import${NC}"
-        
-        PIPE_SCRIPT="
-        set -e
-        echo 'Starting direct pipe import...'
-        
-        if [ -z \"\$DATABASE_URL\" ]; then
-            echo 'ERROR: DATABASE_URL not available'
-            exit 1
-        fi
-        
-        # Import directly from stdin
-        psql \"\$DATABASE_URL\" \
-            --quiet \
-            --no-psqlrc \
-            --single-transaction \
-            --set ON_ERROR_STOP=on
-        
-        echo 'Direct import completed!'
-        "
-        
-        if cat "$DUMP_FILE" | railway run --service "${RAILWAY_DB_SERVICE_NAME}" -- bash -c "$PIPE_SCRIPT" 2>/dev/null; then
-            echo -e "${GREEN}   ✓ Method 2 SUCCESSFUL: Direct import completed!${NC}"
-            IMPORT_SUCCESS=true
-        else
-            echo -e "${RED}   ✗ Method 2 failed${NC}"
-        fi
+    if [ -z "$RAILWAY_DB_URL" ] || [[ ! "$RAILWAY_DB_URL" =~ ^postgresql:// ]]; then
+        echo -e "${RED}Invalid or empty database URL. Exiting.${NC}"
+        exit 1
     fi
 fi
 
-# Final status and manual instructions
-if [ "$IMPORT_SUCCESS" = true ]; then
-    echo -e "${GREEN}🎉 DATABASE IMPORT SUCCESSFUL! 🎉${NC}"
+# Test Railway database connection
+echo -e "${YELLOW}Testing Railway database connection...${NC}"
+if psql "$RAILWAY_DB_URL" -c "SELECT 1;" >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ Successfully connected to Railway database${NC}"
 else
-    echo -e "${RED}❌ AUTOMATED IMPORT METHODS FAILED${NC}"
-    echo -e "${YELLOW}📋 MANUAL IMPORT INSTRUCTIONS:${NC}"
-    echo ""
-    echo -e "${BLUE}Option 1 - Railway CLI Manual Import:${NC}"
-    echo "   1. Transfer the dump file:"
-    echo "      cat '${DUMP_FILE}' | railway run --service ${RAILWAY_DB_SERVICE_NAME} -- bash -c 'cat > /tmp/manual_import.sql'"
-    echo ""
-    echo "   2. Connect and import:"
-    echo "      railway run --service ${RAILWAY_DB_SERVICE_NAME} -- psql \$DATABASE_URL -f /tmp/manual_import.sql"
-    echo ""
-    echo -e "${BLUE}Option 2 - Railway Dashboard:${NC}"
-    echo "   1. Open Railway dashboard: railway open"
-    echo "   2. Go to ${RAILWAY_DB_SERVICE_NAME} service"
-    echo "   3. Click 'Connect' and get connection details"
-    echo "   4. Use a PostgreSQL client with the connection details"
-    echo "   5. Import the dump file: ${DUMP_FILE}"
-    echo ""
-    echo -e "${BLUE}Option 3 - Direct Connection:${NC}"
-    echo "   railway run --service ${RAILWAY_DB_SERVICE_NAME} -- bash -c 'echo \$DATABASE_URL'"
-    echo "   Then use the URL with your local psql: psql [URL] < ${DUMP_FILE}"
-    echo ""
+    echo -e "${RED}Failed to connect to Railway database.${NC}"
+    echo -e "${YELLOW}Please verify the connection URL is correct.${NC}"
+    exit 1
 fi
 
-# Step 4: Cleanup and Backup Management
-echo -e "${BLUE}[4/4] Cleaning up and organizing backups...${NC}"
+# Step 5: Import to Railway
+echo -e "${BLUE}[5/5] Importing data into Railway PostgreSQL database...${NC}"
+
+# Import with transaction safety and better error handling
+echo -e "${YELLOW}Importing database dump...${NC}"
+IMPORT_LOG="import_$(date +%Y%m%d_%H%M%S).log"
+
+# Create a safer import with transaction control
+cat > temp_import.sql << EOF
+BEGIN;
+
+-- Set session variables for safer import
+SET session_replication_role = replica;
+SET client_min_messages = warning;
+
+-- Import the actual dump
+\i ${DUMP_FILE}
+
+-- Reset session variables
+SET session_replication_role = DEFAULT;
+
+COMMIT;
+EOF
+
+# Execute the import
+if psql "$RAILWAY_DB_URL" \
+    --single-transaction \
+    --set ON_ERROR_STOP=on \
+    --no-psqlrc \
+    --quiet \
+    -f temp_import.sql > "$IMPORT_LOG" 2>&1; then
+    
+    echo -e "${GREEN}✓ Database import completed successfully!${NC}"
+    
+    # Verify the import
+    echo -e "${BLUE}Verifying import...${NC}"
+    RAILWAY_TABLE_COUNT=$(psql "$RAILWAY_DB_URL" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs)
+    echo -e "${GREEN}Railway database now has ${RAILWAY_TABLE_COUNT} tables${NC}"
+    
+    # Show imported tables
+    echo -e "${BLUE}Imported tables:${NC}"
+    psql "$RAILWAY_DB_URL" -c "\dt" 2>/dev/null || echo -e "${YELLOW}Could not list tables${NC}"
+    
+    IMPORT_SUCCESS=true
+else
+    echo -e "${RED}Database import failed!${NC}"
+    echo -e "${YELLOW}Error details (last 20 lines):${NC}"
+    tail -20 "$IMPORT_LOG" 2>/dev/null || echo "No error log available"
+    IMPORT_SUCCESS=false
+fi
+
+# Clean up temporary files
+rm -f temp_import.sql
+
+# Step 6: Cleanup and Backup Management
+echo -e "${BLUE}[6/6] Cleaning up and organizing backups...${NC}"
 
 # Create backup directory and organize files
 mkdir -p ./database_backups
 cp "$DUMP_FILE" ./database_backups/
+if [ -f "$IMPORT_LOG" ]; then
+    cp "$IMPORT_LOG" ./database_backups/
+fi
 echo -e "${GREEN}Backup saved to: ./database_backups/${DUMP_FILE}${NC}"
 
-# Clean up current directory dump file
-rm -f "$DUMP_FILE"
+# Clean up current directory files
+rm -f "$DUMP_FILE" "$IMPORT_LOG"
 
 # Clean up any temporary files
 rm -f ./src/app.js.bak ./package.json.bak
@@ -436,6 +454,7 @@ rm -f temp_import.sh
 # Keep only the 5 most recent backups
 cd ./database_backups
 ls -t neon_dump_*.sql 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+ls -t import_*.log 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
 cd ..
 
 echo ""
@@ -445,18 +464,19 @@ echo ""
 if [ "$IMPORT_SUCCESS" = true ]; then
     echo -e "${GREEN}✅ Application deployed successfully${NC}"
     echo -e "${GREEN}✅ Database migrated successfully${NC}"
+    echo -e "${GREEN}✅ ${RAILWAY_TABLE_COUNT} tables imported to Railway${NC}"
 else
     echo -e "${GREEN}✅ Application deployed successfully${NC}"
-    echo -e "${YELLOW}⚠️  Database migration requires manual completion${NC}"
+    echo -e "${YELLOW}⚠️  Database migration had issues - check logs${NC}"
 fi
 
 echo ""
 echo -e "${YELLOW}📋 NEXT STEPS:${NC}"
 echo -e "${BLUE}1. Verify environment variables in Railway Dashboard:${NC}"
 echo -e "   • NODE_ENV (should be set to 'production')"
+echo -e "   • DATABASE_URL (should be auto-set by Railway)"
 echo -e "   • CORS_WHITELIST"
 echo -e "   • TELEGRAM_BOT_TOKEN"
-echo -e "   • DATABASE_URL (should be auto-set by Railway)"
 echo -e "   • Any other application-specific variables"
 echo ""
 echo -e "${BLUE}2. Verify your deployment:${NC}"
@@ -467,6 +487,9 @@ echo "   railway open"
 echo ""
 echo -e "${BLUE}4. Monitor database connection:${NC}"
 echo "   railway logs --service ${RAILWAY_DB_SERVICE_NAME}"
+echo ""
+echo -e "${BLUE}5. Test database connectivity:${NC}"
+echo "   railway run --service ${RAILWAY_DB_SERVICE_NAME} -- psql \$DATABASE_URL -c '\\dt'"
 echo ""
 echo -e "${GREEN}🎉 Deployment automation completed! 🎉${NC}"
 
