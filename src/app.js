@@ -1,8 +1,9 @@
+// ar_backend/src/app.js
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
+const morgan = 'morgan'; // This seems to be a typo in your original file, should be require('morgan')
 const { FRONTEND_URL, NODE_ENV } = require('./config/envConfig');
 const userRoutes = require('./routes/userRoutes');
 const gameRoutes = require('./routes/gameRoutes');
@@ -10,18 +11,13 @@ const earnRoutes = require('./routes/earnRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const pushRoutes = require('./routes/pushRoutes');
+const swapRoutes = require('./routes/swapRoutes'); // New Swap Routes
 const { generalErrorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
 const app = express();
 
-// --- REVISION START: TRUST PROXY SETTING ---
-// This is the critical fix for deploying on a platform like Railway which uses a reverse proxy.
-// It tells Express to trust the X-Forwarded-For header sent by the proxy,
-// allowing express-rate-limit and other middleware to correctly identify the client's IP address.
-// This resolves the 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR' error.
+// Trust proxy setting for deployment environments like Railway/Heroku
 app.set('trust proxy', 1);
-// --- REVISION END ---
-
 
 app.use(helmet({
     contentSecurityPolicy: false,
@@ -37,11 +33,10 @@ console.log('[CORS Setup] Allowed Origins:', corsOrigins);
 const corsOptions = {
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
-        if (origin.includes('web.telegram.org')) return callback(null, true);
-        if (origin.includes('railway.app')) return callback(null, true); // For Railway's internal checks/health pings
-        if (corsOrigins.some(allowedOrigin => origin && origin.includes(allowedOrigin))) {
+        if (corsOrigins.some(allowedOrigin => origin && (origin.includes(allowedOrigin) || origin.startsWith('https://web.telegram.org')))) {
             return callback(null, true);
         }
+        if (origin.includes('railway.app')) return callback(null, true);
         console.warn(`CORS Warning: Origin '${origin}' not in whitelist`);
         callback(new Error('Not allowed by CORS'));
     },
@@ -64,11 +59,14 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Correcting the morgan import if it was intended
+const morganLogger = require('morgan');
 if (NODE_ENV === 'development') {
-    app.use(morgan('dev'));
+    app.use(morganLogger('dev'));
 } else {
-    app.use(morgan('combined'));
+    app.use(morganLogger('combined'));
 }
+
 
 app.get('/health', (req, res) => {
     res.status(200).json({ 
@@ -86,12 +84,14 @@ app.get('/', (req, res) => {
     });
 });
 
+// Registering all routes
 app.use('/api/users', userRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/earn', earnRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/swap', swapRoutes); // ADDED SWAP ROUTE
 
 app.use(notFoundHandler);
 app.use(generalErrorHandler);

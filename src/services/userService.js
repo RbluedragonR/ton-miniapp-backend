@@ -1,21 +1,18 @@
-
+// ar_backend/src/services/userService.js
 const db = require('../config/database');
-const { USDT_DECIMALS, ARIX_DECIMALS } = require('../utils/constants'); 
+const { USDT_DECIMALS, ARIX_DECIMALS } = require('../utils/constants');
 
 class UserService {
+    /**
+     * Fetches a comprehensive user profile, including referrer details.
+     * Your original method, with added fields for new balances.
+     */
     async fetchUserProfile(walletAddress) {
         const userQuery = `
             SELECT 
-                u.wallet_address, 
-                u.username, 
-                u.telegram_id, 
-                u.referral_code,
-                u.referrer_wallet_address,
+                u.*,
                 r.username as referrer_username,
-                r.referral_code as referrer_code,
-                u.created_at, 
-                u.claimable_usdt_balance, 
-                u.claimable_arix_rewards
+                r.referral_code as referrer_code
             FROM users u
             LEFT JOIN users r ON u.referrer_wallet_address = r.wallet_address
             WHERE u.wallet_address = $1;
@@ -23,53 +20,41 @@ class UserService {
         const { rows } = await db.query(userQuery, [walletAddress]);
 
         if (rows.length === 0) {
-            
-            
             const newUser = await this.ensureUserExists(walletAddress);
             return {
-                wallet_address: newUser.wallet_address,
-                username: newUser.username,
-                telegram_id: newUser.telegram_id,
-                referral_code: newUser.referral_code,
-                referrer_wallet_address: newUser.referrer_wallet_address,
-                referrer_username: null, 
-                referrer_code: null,
-                created_at: newUser.created_at,
+                ...newUser,
                 claimable_usdt_balance: parseFloat(newUser.claimable_usdt_balance || 0).toFixed(USDT_DECIMALS || 6),
                 claimable_arix_rewards: parseFloat(newUser.claimable_arix_rewards || 0).toFixed(ARIX_DECIMALS || 9),
-                is_new_user: true, 
+                balance: parseFloat(newUser.balance || 0).toFixed(ARIX_DECIMALS || 9), // Added for internal games/swap
+                ton_balance: parseFloat(newUser.ton_balance || 0).toFixed(9), // Added for internal games/swap
+                usdt_balance: parseFloat(newUser.usdt_balance || 0).toFixed(USDT_DECIMALS || 6), // Added for internal games/swap
+                is_new_user: true,
             };
         }
+        
         const user = rows[0];
         return {
-            wallet_address: user.wallet_address,
-            username: user.username,
-            telegram_id: user.telegram_id,
-            referral_code: user.referral_code,
-            referrer_wallet_address: user.referrer_wallet_address,
-            referrer_username: user.referrer_username,
-            referrer_code: user.referrer_code,
-            created_at: user.created_at,
+            ...user,
             claimable_usdt_balance: parseFloat(user.claimable_usdt_balance || 0).toFixed(USDT_DECIMALS || 6),
             claimable_arix_rewards: parseFloat(user.claimable_arix_rewards || 0).toFixed(ARIX_DECIMALS || 9),
+            balance: parseFloat(user.balance || 0).toFixed(ARIX_DECIMALS || 9), // Added for internal games/swap
+            ton_balance: parseFloat(user.ton_balance || 0).toFixed(9), // Added for internal games/swap
+            usdt_balance: parseFloat(user.usdt_balance || 0).toFixed(USDT_DECIMALS || 6), // Added for internal games/swap
             is_new_user: false,
         };
     }
 
+    /**
+     * Ensures a user exists, creating them if necessary.
+     * Your original method, updated to initialize new balance columns.
+     */
     async ensureUserExists(walletAddress, telegramId = null, username = null, referrerCodeOrAddress = null) {
-        
-        
-        
-        
-
         let referrerWallet = null;
         if (referrerCodeOrAddress) {
-            
             const directReferrer = await db.query("SELECT wallet_address FROM users WHERE wallet_address = $1", [referrerCodeOrAddress]);
             if (directReferrer.rows.length > 0) {
                 referrerWallet = directReferrer.rows[0].wallet_address;
             } else {
-                
                 const referrerByCode = await db.query("SELECT wallet_address FROM users WHERE referral_code = $1", [referrerCodeOrAddress]);
                 if (referrerByCode.rows.length > 0) {
                     referrerWallet = referrerByCode.rows[0].wallet_address;
@@ -82,8 +67,8 @@ class UserService {
         }
 
         const query = `
-            INSERT INTO users (wallet_address, telegram_id, username, referrer_wallet_address, created_at, updated_at, claimable_usdt_balance, claimable_arix_rewards)
-            VALUES ($1, $2, $3, $4, NOW(), NOW(), 0, 0)
+            INSERT INTO users (wallet_address, telegram_id, username, referrer_wallet_address, created_at, updated_at, claimable_usdt_balance, claimable_arix_rewards, balance, ton_balance, usdt_balance)
+            VALUES ($1, $2, $3, $4, NOW(), NOW(), 0, 0, 0, 0, 0)
             ON CONFLICT (wallet_address) DO UPDATE SET
                 updated_at = NOW(),
                 telegram_id = COALESCE(users.telegram_id, EXCLUDED.telegram_id),
@@ -103,9 +88,72 @@ class UserService {
         }
     }
 
+    /**
+     * Gets a user by their referral code.
+     * Your original method, preserved completely.
+     */
     async getUserByReferralCode(referralCode) {
         const { rows } = await db.query("SELECT wallet_address, username FROM users WHERE referral_code = $1", [referralCode]);
         return rows[0] || null;
+    }
+
+    /**
+     * NEW METHOD: Updates internal currency balances within a single transaction.
+     * Uses your raw SQL and client pattern.
+     */
+    async updateUserBalances(walletAddress, balanceChanges, type, metadata, client) {
+        const userResult = await client.query("SELECT * FROM users WHERE wallet_address = $1 FOR UPDATE", [walletAddress]);
+        if (userResult.rows.length === 0) {
+            throw new Error('User not found for balance update.');
+        }
+        const user = userResult.rows[0];
+
+        let updateClauses = [];
+        const updateValues = [];
+
+        Object.entries(balanceChanges).forEach(([currency, change]) => {
+            const floatChange = parseFloat(change);
+            if (isNaN(floatChange)) return;
+
+            let field;
+            switch (currency.toUpperCase()) {
+                case 'ARIX': field = 'balance'; break;
+                case 'TON': field = 'ton_balance'; break;
+                case 'USDT': field = 'usdt_balance'; break;
+                default: throw new Error(`Invalid currency: ${currency}`);
+            }
+            
+            const currentBalance = parseFloat(user[field] || 0);
+            if (currentBalance + floatChange < 0) {
+                 throw new Error(`Insufficient funds for ${currency}. Required: ${Math.abs(floatChange)}, Available: ${currentBalance}`);
+            }
+
+            updateClauses.push(`${field} = ${field} + $${updateValues.length + 1}`);
+            updateValues.push(floatChange);
+        });
+        
+        if (updateClauses.length > 0) {
+            const updateQuery = `UPDATE users SET ${updateClauses.join(', ')}, updated_at = NOW() WHERE wallet_address = $${updateValues.length + 1}`;
+            updateValues.push(walletAddress);
+            await client.query(updateQuery, updateValues);
+        }
+        
+        const amountForTransaction = balanceChanges['ARIX'] !== undefined ? balanceChanges['ARIX'] : (balanceChanges['USDT'] || balanceChanges['TON'] || 0);
+        
+        await client.query(
+            // NOTE: The `transactions` table in your schema needs a `user_wallet_address` column. 
+            // If it uses `user_id`, this needs adjustment or schema migration. Assuming `user_wallet_address` for consistency.
+            "INSERT INTO transactions (user_wallet_address, type, amount, metadata, created_at) VALUES ($1, $2, $3, $4, NOW())",
+            [walletAddress, type, amountForTransaction, JSON.stringify(metadata)]
+        );
+    }
+    
+    /**
+     * NEW METHOD: Fetches transaction history for a user.
+     */
+    async getUserTransactions(walletAddress) {
+        const { rows } = await db.query("SELECT * FROM transactions WHERE user_wallet_address = $1 ORDER BY created_at DESC", [walletAddress]);
+        return rows;
     }
 }
 

@@ -1,8 +1,7 @@
 // ar_backend/src/controllers/gameController.js
-
 const gameService = require('../services/gameService');
 const { Address } = require('@ton/core');
-const pool = require('../config/database');  
+const pool = require('../config/database');
 
 const isValidTonAddress = (addr) => {
     if (!addr) return false;
@@ -14,6 +13,7 @@ const isValidTonAddress = (addr) => {
     }
 };
 
+// --- PRESERVED ORIGINAL METHODS ---
 exports.handleCoinflipBet = async (req, res, next) => {
     try {
         const { userWalletAddress, betAmountArix, choice } = req.body;
@@ -32,7 +32,6 @@ exports.handleCoinflipBet = async (req, res, next) => {
             return res.status(400).json({ message: "Invalid choice. Must be 'heads' or 'tails'." });
         }
 
-        // Call the service, which now correctly handles its own DB transactions.
         const gameResult = await gameService.playCoinflip({
             userWalletAddress,
             betAmountArix: numericBetAmount,
@@ -64,9 +63,6 @@ exports.getCoinflipHistoryForUser = async (req, res, next) => {
   }
 };
 
-/**
- * Controller for fetching a user's personal Crash game history from the database.
- */
 exports.getCrashHistoryForUser = async (req, res, next) => {
     try {
         const { walletAddress } = req.params;
@@ -94,6 +90,66 @@ exports.getCrashHistoryForUser = async (req, res, next) => {
         res.status(200).json(rows);
     } catch (error) {
         console.error("CTRL: Error fetching crash history:", error);
+        next(error);
+    }
+};
+
+
+// --- NEW AND UPDATED METHODS FOR NEW GAMES ---
+
+// For Crash Game state and actions
+exports.getCrashState = (req, res) => {
+    res.json(gameService.getCrashState());
+};
+
+exports.placeCrashBet = async (req, res, next) => {
+    try {
+        const { userWalletAddress, betAmount, cashOutMultiplier } = req.body;
+         if (!isValidTonAddress(userWalletAddress)) {
+            return res.status(400).json({ message: "Invalid userWalletAddress format." });
+        }
+        const result = await gameService.placeCrashBet({ userWalletAddress, betAmount, cashOutMultiplier });
+        res.status(201).json(result);
+    } catch (error) {
+        if(error.message.includes('Insufficient funds') || error.message.includes('Invalid bet')){
+            return res.status(400).json({ message: error.message });
+        }
+        next(error);
+    }
+};
+
+exports.cashOutCrash = async (req, res, next) => {
+    try {
+        const { userWalletAddress } = req.body;
+        if (!isValidTonAddress(userWalletAddress)) {
+            return res.status(400).json({ message: "Invalid userWalletAddress format." });
+        }
+        const result = await gameService.cashOutCrashBet({ userWalletAddress });
+        res.status(200).json(result);
+    } catch (error) {
+        if(error.message.includes('not found') || error.message.includes('already')){
+            return res.status(400).json({ message: error.message });
+        }
+        next(error);
+    }
+};
+
+// For Plinko Game
+exports.playPlinko = async (req, res, next) => {
+    try {
+        const { userWalletAddress, betAmount, risk, rows } = req.body;
+        if (!isValidTonAddress(userWalletAddress)) {
+            return res.status(400).json({ message: "Invalid userWalletAddress format." });
+        }
+        if (!betAmount || !risk || !rows) {
+             return res.status(400).json({ message: "Missing required plinko game information." });
+        }
+        const result = await gameService.playPlinko({ userWalletAddress, betAmount, risk, rows });
+        res.status(200).json(result);
+    } catch (error) {
+        if(error.message.includes('Insufficient funds') || error.message.includes('Invalid')){
+             return res.status(400).json({ message: error.message });
+        }
         next(error);
     }
 };

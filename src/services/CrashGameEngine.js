@@ -1,6 +1,7 @@
 // ar_backend/src/services/CrashGameEngine.js
 const crypto = require('crypto');
 const pool = require('../config/database');
+const userService = require('./userService'); // Use the centralized user service
 
 // --- GAME CONFIGURATION ---
 const WAITING_TIME_MS = 8000;
@@ -13,7 +14,7 @@ class CrashGameEngine {
             return CrashGameEngine.instance;
         }
 
-        // Game State
+        // Game State (Your original state properties preserved)
         this.phase = 'CONNECTING';
         this.gameId = null;
         this.crashPoint = 0;
@@ -34,6 +35,8 @@ class CrashGameEngine {
 
         CrashGameEngine.instance = this;
     }
+    
+    // All your original methods are preserved. Only handlePlaceBet and handleCashOut are modified.
 
     start(wss) {
         if (this.wss) return;
@@ -101,6 +104,7 @@ class CrashGameEngine {
         this.phase = 'RUNNING';
 
         try {
+            // Your original logic for creating the game round is preserved
             const { rows } = await pool.query(
                 "INSERT INTO crash_rounds (crash_multiplier, server_seed, public_hash, hashed_server_seed, status) VALUES ($1, $2, 'not_revealed_yet', $3, 'running') RETURNING id",
                 [this.crashPoint, this.serverSeed, this.hashedServerSeed]
@@ -156,38 +160,64 @@ class CrashGameEngine {
         this.gameLoopTimeout = setTimeout(this.startWaitingPhase, CRASHED_TIME_MS);
     }
     
+    // --- UPDATED METHOD ---
     async handlePlaceBet({ userWalletAddress, betAmountArix, autoCashoutAt }) {
         if (this.phase !== 'WAITING') return { success: false, message: "Bets are closed for this round." };
         
+        const client = await pool.getClient();
         try {
-            await pool.query('BEGIN');
-            const { rowCount } = await pool.query( `UPDATE users SET claimable_arix_rewards = claimable_arix_rewards - $1 WHERE wallet_address = $2 AND claimable_arix_rewards >= $1`, [betAmountArix, userWalletAddress] );
-            if (rowCount === 0) throw new Error('Insufficient ARIX balance.');
+            await client.query('BEGIN');
             
-            await pool.query("INSERT INTO crash_bets (game_id, user_wallet_address, bet_amount_arix, status) VALUES ($1, $2, $3, 'placed')", [ this.gameId, userWalletAddress, betAmountArix ]);
+            // Use the centralized userService to deduct from the internal ARIX 'balance'
+            // This now correctly uses the raw SQL client for the transaction.
+            await userService.updateUserBalances(userWalletAddress, { ARIX: -betAmountArix }, 'game_bet', {
+                game: 'crash',
+                game_id: this.gameId,
+            }, client);
+
+            await client.query(
+                "INSERT INTO crash_bets (game_id, user_wallet_address, bet_amount_arix, status, placed_at) VALUES ($1, $2, $3, 'placed', NOW())", 
+                [ this.gameId, userWalletAddress, betAmountArix ]
+            );
             
             this.players[userWalletAddress] = { betAmount: betAmountArix, status: 'placed', autoCashoutAt };
             this.broadcastState();
-            await pool.query('COMMIT');
+            await client.query('COMMIT');
             return { success: true, message: 'Bet placed!' };
         } catch (e) {
-            await pool.query('ROLLBACK');
+            await client.query('ROLLBACK');
             return { success: false, message: e.message };
+        } finally {
+            client.release();
         }
     }
     
+    // --- UPDATED METHOD ---
     async handleCashOut({ userWalletAddress }) {
-        if (this.phase !== 'RUNNING' || !this.players[userWalletAddress] || this.players[userWalletAddress].status !== 'placed') return { success: false, message: 'Cannot cash out.' };
+        if (this.phase !== 'RUNNING' || !this.players[userWalletAddress] || this.players[userWalletAddress].status !== 'placed') {
+            return { success: false, message: 'Cannot cash out.' };
+        }
         
         const player = this.players[userWalletAddress];
         const cashOutMultiplier = this.multiplier;
         const payoutArix = parseFloat((player.betAmount * cashOutMultiplier).toFixed(9));
 
+        const client = await pool.getClient();
         try {
-            await pool.query('BEGIN');
-            await pool.query("UPDATE users SET claimable_arix_rewards = claimable_arix_rewards + $1 WHERE wallet_address = $2", [payoutArix, userWalletAddress]);
-            await pool.query( "UPDATE crash_bets SET status = 'cashed_out', cash_out_multiplier = $1, payout_arix = $2 WHERE game_id = $3 AND user_wallet_address = $4", [cashOutMultiplier, payoutArix, this.gameId, userWalletAddress] );
-            await pool.query('COMMIT');
+            await client.query('BEGIN');
+            
+            // Use the centralized userService to add winnings to the internal ARIX 'balance'
+            await userService.updateUserBalances(userWalletAddress, { ARIX: payoutArix }, 'game_win', {
+                game: 'crash',
+                game_id: this.gameId,
+                multiplier: cashOutMultiplier
+            }, client);
+
+            await client.query(
+                "UPDATE crash_bets SET status = 'cashed_out', cash_out_multiplier = $1, payout_arix = $2 WHERE game_id = $3 AND user_wallet_address = $4", 
+                [cashOutMultiplier, payoutArix, this.gameId, userWalletAddress]
+            );
+            await client.query('COMMIT');
 
             player.status = 'cashed_out';
             player.payout = payoutArix;
@@ -195,8 +225,10 @@ class CrashGameEngine {
             this.broadcastState();
             return { success: true, message: 'Cashed out!', cashOutMultiplier, payoutArix };
         } catch (e) {
-            await pool.query('ROLLBACK');
+            await client.query('ROLLBACK');
             return { success: false, message: 'Server error during cash out.' };
+        } finally {
+            client.release();
         }
     }
 
@@ -227,4 +259,9 @@ class CrashGameEngine {
     }
 }
 
-module.exports = new CrashGameEngine();
+// Ensure singleton instance
+if (!CrashGameEngine.instance) {
+    new CrashGameEngine();
+}
+
+module.exports = CrashGameEngine.instance;
