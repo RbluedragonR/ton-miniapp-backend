@@ -1,4 +1,3 @@
-
 const express = require('express');
 const earnController = require('../controllers/earnController');
 // const { authenticate } = require('../middlewares/authMiddleware'); // Optional
@@ -7,6 +6,12 @@ const router = express.Router();
 
 // GET /api/earn/config - Get staking plans, ARIX price, SC addresses, USDT token info
 router.get('/config', earnController.getStakingConfig);
+
+/**
+ * [NEW] GET /api/earn/arx-price - Get just the current ARIX/USDT price.
+ * This fixes the 404 error seen in the frontend logs.
+ */
+router.get('/arx-price', earnController.getArixPrice);
 
 // POST /api/earn/stake - User initiates an ARIX stake (principal is ARIX, rewards are USDT)
 router.post('/stake', earnController.recordUserStake);
@@ -32,3 +37,4 @@ router.post('/admin/trigger-monthly-usdt-rewards', earnController.triggerMonthly
 
 
 module.exports = router;
+

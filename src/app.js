@@ -59,7 +59,7 @@ app.use(rateLimit({
 app.get('/', (req, res) => res.json({ message: 'ARIX Terminal Backend is running!' }));
 app.get('/health', (req, res) => res.status(200).json({ status: 'healthy' }));
 
-app.use('/api/users', userRoutes);
+app.use('/api/user', userRoutes); // Changed to singular 'user'
 app.use('/api/game', gameRoutes);
 app.use('/api/earn', earnRoutes);
 app.use('/api/tasks', taskRoutes);

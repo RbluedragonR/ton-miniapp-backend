@@ -1,4 +1,6 @@
-
+//================================================================
+// FILE: ar_backend/src/controllers/earnController.js (UPDATED)
+//================================================================
 const earnService = require('../services/earnService');
 const priceService = require('../services/priceService');
 const { Address } = require('@ton/core');
@@ -6,7 +8,7 @@ const {
     ARIX_TOKEN_MASTER_ADDRESS,
     STAKING_CONTRACT_ADDRESS,
     STAKING_CONTRACT_JETTON_WALLET_ADDRESS,
-    USDT_JETTON_MASTER_ADDRESS, // Added for config if needed by frontend
+    USDT_JETTON_MASTER_ADDRESS,
 } = require('../config/envConfig');
 const { ARIX_DECIMALS, USDT_DECIMALS } = require('../utils/constants');
 
@@ -28,11 +30,11 @@ exports.getStakingConfig = async (req, res, next) => {
         const config = {
             stakingContractAddress: STAKING_CONTRACT_ADDRESS,
             stakingContractJettonWalletAddress: STAKING_CONTRACT_JETTON_WALLET_ADDRESS,
-            arxToken: { // ARIX token details (for staking principal)
+            arxToken: {
                 masterAddress: ARIX_TOKEN_MASTER_ADDRESS,
                 decimals: ARIX_DECIMALS,
             },
-            usdtToken: { // USDT token details (for rewards)
+            usdtToken: {
                 masterAddress: USDT_JETTON_MASTER_ADDRESS,
                 decimals: USDT_DECIMALS,
             },
@@ -58,12 +60,27 @@ exports.getStakingConfig = async (req, res, next) => {
     }
 };
 
+/**
+ * [NEW] Controller to fetch the ARIX price.
+ * This provides a dedicated endpoint for the frontend.
+ */
+exports.getArixPrice = async (req, res, next) => {
+    try {
+        const price = await priceService.getArxUsdtPrice();
+        res.status(200).json({ price });
+    } catch (error) {
+        console.error("CTRL: Error in getArixPrice:", error);
+        next(error);
+    }
+};
+
+
 exports.recordUserStake = async (req, res, next) => {
     try {
         const {
             planKey, arixAmount, userWalletAddress,
             transactionBoc, transactionHash, stakeUUID,
-            referenceUsdtValue, referrerCodeOrAddress // Changed from referrerWalletAddress
+            referenceUsdtValue, referrerCodeOrAddress
         } = req.body;
 
         if (!planKey || !arixAmount || !userWalletAddress || !transactionBoc || !referenceUsdtValue || !transactionHash || !stakeUUID) {
@@ -72,7 +89,7 @@ exports.recordUserStake = async (req, res, next) => {
         if (!isValidTonAddress(userWalletAddress)) {
             return res.status(400).json({ message: "Invalid userWalletAddress format." });
         }
-        if (referrerCodeOrAddress && typeof referrerCodeOrAddress !== 'string') { // Basic check
+        if (referrerCodeOrAddress && typeof referrerCodeOrAddress !== 'string') {
             return res.status(400).json({ message: "Invalid referrer format." });
         }
 
@@ -93,7 +110,7 @@ exports.recordUserStake = async (req, res, next) => {
             transactionHash,
             stakeUUID,
             referenceUsdtValue: numericReferenceUsdtValue,
-            referrerCodeOrAddress // Pass code or address
+            referrerCodeOrAddress
         });
 
         res.status(201).json({
@@ -117,7 +134,7 @@ exports.getUserStakesAndRewards = async (req, res, next) => {
         }
         const currentArxPrice = await priceService.getArxUsdtPrice();
         const data = await earnService.findAllStakesAndRewardsByUser(userWalletAddress, currentArxPrice);
-        res.status(200).json(data); // Includes stakes, totalClaimableUsdt, totalClaimableArix
+        res.status(200).json(data);
     }
     catch (error) {
         console.error("CTRL: Error in getUserStakesAndRewards:", error);

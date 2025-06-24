@@ -47,6 +47,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // --- Middleware ---
+app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -64,7 +65,7 @@ app.use(limiter);
 CrashGameEngine.start(wss);
 
 // --- API Routes ---
-app.use('/api/users', userRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api/earn', earnRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/referrals', referralRoutes);
