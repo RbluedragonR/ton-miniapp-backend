@@ -1,58 +1,48 @@
 // ar_backend/src/services/gameService.js
-const pool = require('../config/database');
+
+// ### NOTE: Changed from `pool` to `getClient` for transaction safety ###
+const { getClient, query } = require('../config/database');
 const CrashGameEngine = require('./CrashGameEngine');
 const userService = require('./userService');
 const plinkoService = require('./plinkoService');
 const { ARIX_DECIMALS } = require('../utils/constants');
+const { Address } = require('@ton/core'); // Import Address for validation
 
 class GameService {
 
-    // --- Coinflip Methods (Your original logic, preserved) ---
+    // --- Coinflip Methods (Your original logic, now using transactions) ---
     async playCoinflip({ userWalletAddress, betAmountArix, choice }) {
-        const randomNumber = Math.random();
-        const serverCoinSide = randomNumber < 0.5 ? 'heads' : 'tails';
-        const outcome = (choice === serverCoinSide) ? 'win' : 'loss';
-        // Note: Your original logic used a single amount for win/loss. A 2x payout would mean `amountDelta = betAmountArix`.
-        // I'm keeping your original logic which seems to be 1x reward or 1x loss.
-        const amountDelta = (outcome === 'win') ? parseFloat(betAmountArix) : -parseFloat(betAmountArix);
-        
-        const client = await pool.getClient();
+        const client = await getClient();
         try {
             await client.query('BEGIN');
             
-            const userCheck = await client.query('SELECT claimable_arix_rewards FROM users WHERE wallet_address = $1 FOR UPDATE', [userWalletAddress]);
-            
-            if (userCheck.rows.length === 0) {
-                 await client.query('ROLLBACK');
-                 throw new Error("User not found. Please visit the main app page first.");
-            }
-            
-            const userData = userCheck.rows[0];
-            const currentBalance = parseFloat(userData.claimable_arix_rewards);
+            // This now uses the robust userService which handles user existence and balance checks.
+            await userService.updateUserBalances(userWalletAddress, { ARIX: -betAmountArix }, 'game_bet_coinflip', { game: 'coinflip' }, client);
 
-            if (amountDelta < 0 && currentBalance < betAmountArix) {
-                 await client.query('ROLLBACK');
-                 throw new Error('Insufficient ARIX balance.');
+            const randomNumber = Math.random();
+            const serverCoinSide = randomNumber < 0.5 ? 'heads' : 'tails';
+            const outcome = (choice === serverCoinSide) ? 'win' : 'loss';
+            const winnings = (outcome === 'win') ? betAmountArix * 2 : 0;
+            const amountDelta = winnings - betAmountArix;
+
+            if (outcome === 'win') {
+                await userService.updateUserBalances(userWalletAddress, { ARIX: winnings }, 'game_win_coinflip', { game: 'coinflip' }, client);
             }
 
-            const newClaimableArixFloat = currentBalance + amountDelta;
-            await client.query(
-                `UPDATE users SET claimable_arix_rewards = $1, updated_at = NOW() WHERE wallet_address = $2`,
-                [newClaimableArixFloat, userWalletAddress]
-            );
-
-            await client.query(
-                `INSERT INTO coinflip_history (user_wallet_address, bet_amount_arix, choice, server_coin_side, outcome, amount_delta_arix, played_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-                [userWalletAddress, betAmountArix, choice, serverCoinSide, outcome, amountDelta]
-            );
-
+            const historyQuery = `
+                INSERT INTO coinflip_history (user_wallet_address, bet_amount_arix, choice, server_coin_side, outcome, amount_delta_arix, played_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`;
+            await client.query(historyQuery, [userWalletAddress, betAmountArix, choice, serverCoinSide, amountDelta]);
+            
             await client.query('COMMIT');
+            
+            const updatedProfile = await userService.fetchUserProfile(userWalletAddress);
+
             return {
                 outcome,
                 server_coin_side: serverCoinSide,
                 amount_delta_arix: amountDelta,
-                newClaimableArixRewards: newClaimableArixFloat.toFixed(ARIX_DECIMALS),
+                newClaimableArixRewards: updatedProfile.claimable_arix_rewards, // Return the updated total
             };
         } catch (error) {
             await client.query('ROLLBACK');
@@ -64,7 +54,7 @@ class GameService {
     }
 
     async getCoinflipHistory(userWalletAddress) {
-        const { rows } = await pool.query(
+        const { rows } = await query(
             "SELECT * FROM coinflip_history WHERE user_wallet_address = $1 ORDER BY played_at DESC LIMIT 50",
             [userWalletAddress]
         );
@@ -72,39 +62,34 @@ class GameService {
     }
 
     // --- Crash Game Methods (Delegation preserved) ---
-    getCrashState() {
-        return CrashGameEngine.getGameState();
-    }
+    getCrashState() { return CrashGameEngine.getGameState(); }
+    async placeCrashBet(payload) { return CrashGameEngine.handlePlaceBet(payload); }
+    async cashOutCrashBet(payload) { return CrashGameEngine.handleCashOut(payload); }
 
-    async placeCrashBet(payload) {
-        // Assuming CrashGameEngine is designed to handle its own DB logic
-        return CrashGameEngine.handlePlaceBet(payload);
-    }
-
-    async cashOutCrashBet(payload) {
-        return CrashGameEngine.handleCashOut(payload);
-    }
-
-    // --- NEW PLINKO GAME METHOD ---
+    // --- ### NEW, FULLY FUNCTIONAL PLINKO METHOD ### ---
     async playPlinko({ userWalletAddress, betAmount, risk, rows }) {
         const betAmountFloat = parseFloat(betAmount);
         if (isNaN(betAmountFloat) || betAmountFloat <= 0) {
             throw new Error('Invalid bet amount.');
         }
 
-        const client = await pool.getClient();
+        const client = await getClient();
         try {
             await client.query('BEGIN');
-            
-            // 1. Run the Plinko simulation to get the result first
+
+            // 1. Deduct the bet amount from the user's internal game balance
+            await userService.updateUserBalances(userWalletAddress, { ARIX: -betAmountFloat }, 'game_bet_plinko', { game: 'plinko', risk, rows }, client);
+
+            // 2. Use your existing plinkoService to get a random outcome
             const { multiplier, path, bucketIndex } = plinkoService.runPlinko(rows, risk);
             const payout = betAmountFloat * multiplier;
-            const netChange = payout - betAmountFloat;
 
-            // 2. Update user's internal ARIX `balance` with the net result of the game.
-            await userService.updateUserBalances(userWalletAddress, { ARIX: netChange }, 'game_plinko', { bet: betAmountFloat, multiplier, payout, risk, rows }, client);
+            // 3. If there are winnings, add them to the user's balance
+            if (payout > 0) {
+                await userService.updateUserBalances(userWalletAddress, { ARIX: payout }, 'game_win_plinko', { game: 'plinko', multiplier }, client);
+            }
 
-            // 3. Log the game result to the new `plinko_games` table
+            // 4. Log the game result to the 'plinko_games' table in the database
             const { rows: gameLogRows } = await client.query(
                 `INSERT INTO plinko_games (user_wallet_address, bet_amount, risk, "rows", multiplier, payout, path, created_at)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
@@ -113,17 +98,19 @@ class GameService {
             
             await client.query('COMMIT');
             
+            // 5. Fetch the user's latest profile (with updated balance) to send back
             const updatedUser = await userService.fetchUserProfile(userWalletAddress);
             
             return {
                 ...gameLogRows[0],
-                path: JSON.parse(gameLogRows[0].path),
-                bucketIndex,
+                path: JSON.parse(gameLogRows[0].path), // Ensure path is an array
+                bucketIndex, // Send bucketIndex back to the frontend
                 user: updatedUser 
             };
         } catch (error) {
             await client.query('ROLLBACK');
             console.error('Plinko game transaction failed:', error);
+            // Re-throw the error so the controller can send a proper response
             throw error;
         } finally {
             client.release();

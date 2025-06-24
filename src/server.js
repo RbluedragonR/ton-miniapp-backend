@@ -17,7 +17,6 @@ const allowedOrigins = [
     'https://tma-frontend-gray.vercel.app',
     'http://localhost:5173'
 ];
-
 const corsOptions = {
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
@@ -38,7 +37,6 @@ const gameRoutes = require('./routes/gameRoutes');
 // const announcementRoutes = require('./routes/announcementRoutes');
 
 // --- Service Imports ---
-// ### THE FIX: Using the correct filename 'botService.js' as you pointed out ###
 const botService = require('./services/botService'); 
 const CrashGameEngine = require('./services/CrashGameEngine');
 require('./config/database');
@@ -71,12 +69,13 @@ app.use('/api/earn', earnRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/swap', swapRoutes);
-app.use('/api/games', gameRoutes);
+// ### THIS IS THE FIX ###
+// Changed from '/api/games' to '/api/game' to match the frontend calls.
+app.use('/api/game', gameRoutes);
 // app.use('/api/announcements', announcementRoutes);
 
 // --- Telegram Webhook ---
 app.post(`/telegram-webhook-${process.env.TELEGRAM_BOT_TOKEN}`, (req, res) => {
-    // Use the imported bot instance from botService
     botService.bot.processUpdate(req.body);
     res.sendStatus(200);
 });
@@ -97,6 +96,4 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`[ARIX Final Build] Server starting...`);
     console.log(`[Server] Listening on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
-    // ### THE FIX: Removed the redundant setWebhook call ###
-    // Your botService.js file already handles this when it's imported.
 });
