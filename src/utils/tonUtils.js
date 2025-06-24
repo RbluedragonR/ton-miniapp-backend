@@ -1,8 +1,16 @@
-
+/**
+ * ar_backend/src/utils/tonUtils.js
+ *
+ * This file contains utility functions for interacting with the TON blockchain.
+ * REVISIONS:
+ * - Added `sendArixJettons` function to handle on-chain ARIX withdrawals from the hot wallet.
+ * - This new function is built upon your existing helpers for consistency.
+ * - It constructs and sends a jetton transfer transaction.
+ */
 const { TonClient, Address, Cell, toNano, fromNano, internal, WalletContractV4, KeyPair, mnemonicToPrivateKey } = require("@ton/ton");
 const { getHttpEndpoint } = require("@orbs-network/ton-access");
-const { TON_NETWORK, TON_ACCESS_API_KEY } = require('../config/envConfig');
-const { USDT_DECIMALS, ARIX_DECIMALS } = require('./constants'); // Assuming USDT_DECIMALS is defined
+const { TON_NETWORK, TON_ACCESS_API_KEY, HOT_WALLET_MNEMONIC } = require('../config/envConfig');
+const { USDT_DECIMALS, ARIX_DECIMALS, ARIX_TOKEN_MASTER_ADDRESS } = require('./constants');
 
 let memoizedTonClient = null;
 
@@ -20,7 +28,7 @@ async function getTonClient() {
         return memoizedTonClient;
     } catch (error) {
         console.error("Error initializing TonClient (backend):", error);
-        throw error; // Re-throw to indicate critical failure
+        throw error;
     }
 }
 
@@ -40,22 +48,13 @@ async function getJettonWalletAddress(ownerAddressString, jettonMasterAddressStr
             [{ type: "slice", cell: new Cell().asBuilder().storeAddress(owner).endCell() }]
         );
         const isTestnet = TON_NETWORK === 'testnet';
-        return result.stack.readAddress().toString({ bounceable: true, testOnly: isTestnet });
+        return result.stack.readAddress(); // Return Address object
     } catch (error) {
         console.error(`Error in getJettonWalletAddress for owner ${ownerAddressString}, master ${jettonMasterAddressString}: ${error.message}`);
         return null;
     }
 }
 
-/**
- * Creates the body for a TEP-74 jetton transfer.
- * @param {bigint} jettonAmount - Amount of jettons to transfer in smallest units.
- * @param {string} toAddressString - Recipient's main wallet address.
- * @param {string} responseAddressString - Address for response/bounce (usually sender's main wallet).
- * @param {bigint} forwardTonAmount - Amount of TONs for forwarding the message (e.g., toNano('0.05')).
- * @param {Cell | null} forwardPayload - Optional payload cell.
- * @returns {Cell} The message body cell.
- */
 function createJettonTransferMessage(
     jettonAmount,
     toAddressString,
@@ -81,66 +80,42 @@ function createJettonTransferMessage(
     return bodyBuilder.endCell();
 }
 
-/**
- * Creates a generic forward payload with a comment.
- * @param {bigint} queryId - A unique query ID.
- * @param {string} comment - A text comment for the payload.
- * @returns {Cell} The forward payload cell.
- */
 function createJettonForwardPayload(queryId, comment) {
     const body = new Cell().asBuilder();
-    // You can define an op-code for comments if your contracts expect one
-    // body.storeUint(0x00000000, 32); // Example: op_code for text comment
-    body.storeUint(queryId, 64); // query_id
+    body.storeUint(queryId, 64);
     if (comment && comment.length > 0) {
-        body.storeStringTail(comment.substring(0, 120)); // Limit comment length
+        body.storeStringTail(comment.substring(0, 120));
     }
     return body.endCell();
 }
 
-
-async function getWalletForPayout(mnemonicWordsArray) {
+async function getWalletForPayout() {
+    const mnemonicWordsArray = (HOT_WALLET_MNEMONIC || "").split(' ');
     if (!mnemonicWordsArray || !Array.isArray(mnemonicWordsArray) || mnemonicWordsArray.length < 12) {
-        throw new Error('Invalid or missing mnemonic for backend payout wallet. Must be an array of words.');
+        throw new Error('Invalid or missing HOT_WALLET_MNEMONIC. Must be a space-separated string of words in your environment variables.');
     }
     const keyPair = await mnemonicToPrivateKey(mnemonicWordsArray);
-    const workchain = 0; // Usually 0 for masterchain
+    const workchain = 0;
     const wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
 
     const client = await getTonClient();
-    const contract = client.open(wallet); // Open the contract with the client
+    const contract = client.open(wallet);
     return {
-        contract, // This is the opened wallet contract instance
+        contract,
         keyPair,
-        address: wallet.address.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'})
+        address: wallet.address
     };
 }
 
-/**
- * Waits for a transaction to appear on the blockchain for a given address and sequence number.
- * @param {TonClient} client - The TonClient instance.
- * @param {Address} walletAddress - The address of the wallet that sent the transaction.
- * @param {number} seqno - The sequence number of the transaction.
- * @param {number} timeoutMs - Maximum time to wait in milliseconds.
- * @param {number} intervalMs - Polling interval in milliseconds.
- * @returns {Promise<string|null>} Transaction hash if confirmed, null otherwise.
- */
 async function waitForTransaction(client, walletAddress, seqno, timeoutMs = 120000, intervalMs = 5000) {
     const startTime = Date.now();
     let lastKnownLt = (await client.getContractState(walletAddress)).lastTransaction?.lt;
     if (lastKnownLt) lastKnownLt = BigInt(lastKnownLt);
 
-
     while (Date.now() - startTime < timeoutMs) {
         await new Promise(resolve => setTimeout(resolve, intervalMs));
         try {
-            const transactions = await client.getTransactions(walletAddress, {
-                limit: 5, // Check a few recent transactions
-                // lt: lastKnownLt, // Start from last known to avoid re-fetching old txs
-                // to_lt: BigInt(0),
-                // hash: undefined,
-                // archival: true, // Important for Vercel/serverless where state might not persist
-            });
+            const transactions = await client.getTransactions(walletAddress, { limit: 5 });
 
             for (const tx of transactions) {
                 if (tx.seqno === seqno) {
@@ -148,20 +123,68 @@ async function waitForTransaction(client, walletAddress, seqno, timeoutMs = 1200
                         console.log(`Transaction with seqno ${seqno} confirmed for ${walletAddress.toString()}. Hash: ${tx.hash().toString('hex')}`);
                         return tx.hash().toString('hex');
                     } else {
-                        console.warn(`Transaction with seqno ${seqno} found for ${walletAddress.toString()} but failed or was not generic. Status: ${tx.description.type}, Compute Exit: ${tx.description.computePhase?.type === 'vm' ? tx.description.computePhase.exitCode : 'N/A'}`);
-                        return null; // Transaction found but failed
+                        console.warn(`Transaction with seqno ${seqno} found for ${walletAddress.toString()} but failed or was not generic.`);
+                        return null;
                     }
                 }
             }
-            // if (transactions.length > 0) { // Update lastKnownLt for next poll if needed, though seqno match is primary
-            //     lastKnownLt = transactions[transactions.length - 1].lt;
-            // }
         } catch (pollError) {
             console.warn(`Polling error for transaction (seqno ${seqno}, addr ${walletAddress.toString()}): ${pollError.message}`);
         }
     }
     console.error(`Transaction confirmation timed out for seqno ${seqno} on address ${walletAddress.toString()}.`);
     return null;
+}
+
+/**
+ * [NEW] Sends ARIX jettons from the hot wallet.
+ * @param {string} toAddressString - The recipient's main wallet address.
+ * @param {number|string} amount - The amount of ARIX to send (in human-readable format, e.g., 100.5).
+ * @param {string} memo - A text comment for the transaction.
+ * @returns {Promise<{success: boolean, seqno: number}>}
+ */
+async function sendArixJettons(toAddressString, amount, memo) {
+    const client = await getTonClient();
+    const hotWallet = await getWalletForPayout();
+
+    const hotWalletJettonAddress = await getJettonWalletAddress(hotWallet.address.toString(), ARIX_TOKEN_MASTER_ADDRESS);
+    if (!hotWalletJettonAddress) {
+        throw new Error("Could not derive the hot wallet's ARIX jetton address.");
+    }
+    
+    // Create the message body for the jetton transfer
+    const forwardPayload = memo ? createJettonForwardPayload(BigInt(0), memo) : null;
+    const jettonAmount = toNano(amount.toString());
+    const messageBody = createJettonTransferMessage(
+        jettonAmount,
+        toAddressString,
+        hotWallet.address.toString(), // response address
+        toNano('0.05'),
+        forwardPayload
+    );
+
+    // Get the sequence number for the hot wallet
+    const seqno = await hotWallet.contract.getSeqno();
+
+    // Send the transaction from the main hot wallet to its own jetton wallet
+    await hotWallet.contract.sendTransfer({
+        secretKey: hotWallet.keyPair.secretKey,
+        seqno: seqno,
+        messages: [
+            internal({
+                to: hotWalletJettonAddress,
+                value: toNano("0.1"), // tons to send with the message to the jetton wallet
+                body: messageBody,
+            }),
+        ],
+    });
+
+    console.log(`Withdrawal transaction sent with seqno: ${seqno}. Waiting for confirmation...`);
+
+    // Optional: wait for the transaction to be confirmed
+    // await waitForTransaction(client, hotWallet.address, seqno);
+
+    return { success: true, seqno };
 }
 
 
@@ -172,4 +195,5 @@ module.exports = {
     createJettonForwardPayload,
     getWalletForPayout,
     waitForTransaction,
+    sendArixJettons, // <-- Export the new function
 };

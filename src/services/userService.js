@@ -1,6 +1,6 @@
-// ar_backend/src/services/userService.js
 const db = require('../config/database');
 const { USDT_DECIMALS, ARIX_DECIMALS } = require('../utils/constants');
+const { sendArixJettons } = require('../utils/tonUtils');
 
 class UserService {
     /**
@@ -25,9 +25,9 @@ class UserService {
                 ...newUser,
                 claimable_usdt_balance: parseFloat(newUser.claimable_usdt_balance || 0).toFixed(USDT_DECIMALS || 6),
                 claimable_arix_rewards: parseFloat(newUser.claimable_arix_rewards || 0).toFixed(ARIX_DECIMALS || 9),
-                balance: parseFloat(newUser.balance || 0).toFixed(ARIX_DECIMALS || 9), // Added for internal games/swap
-                ton_balance: parseFloat(newUser.ton_balance || 0).toFixed(9), // Added for internal games/swap
-                usdt_balance: parseFloat(newUser.usdt_balance || 0).toFixed(USDT_DECIMALS || 6), // Added for internal games/swap
+                balance: parseFloat(newUser.balance || 0).toFixed(ARIX_DECIMALS || 9),
+                ton_balance: parseFloat(newUser.ton_balance || 0).toFixed(9),
+                usdt_balance: parseFloat(newUser.usdt_balance || 0).toFixed(USDT_DECIMALS || 6),
                 is_new_user: true,
             };
         }
@@ -37,9 +37,9 @@ class UserService {
             ...user,
             claimable_usdt_balance: parseFloat(user.claimable_usdt_balance || 0).toFixed(USDT_DECIMALS || 6),
             claimable_arix_rewards: parseFloat(user.claimable_arix_rewards || 0).toFixed(ARIX_DECIMALS || 9),
-            balance: parseFloat(user.balance || 0).toFixed(ARIX_DECIMALS || 9), // Added for internal games/swap
-            ton_balance: parseFloat(user.ton_balance || 0).toFixed(9), // Added for internal games/swap
-            usdt_balance: parseFloat(user.usdt_balance || 0).toFixed(USDT_DECIMALS || 6), // Added for internal games/swap
+            balance: parseFloat(user.balance || 0).toFixed(ARIX_DECIMALS || 9),
+            ton_balance: parseFloat(user.ton_balance || 0).toFixed(9),
+            usdt_balance: parseFloat(user.usdt_balance || 0).toFixed(USDT_DECIMALS || 6),
             is_new_user: false,
         };
     }
@@ -85,6 +85,101 @@ class UserService {
         } catch (error) {
             console.error(`Error in ensureUserExists for ${walletAddress}:`, error);
             throw error;
+        }
+    }
+
+    /**
+     * [NEW] Processes an ARIX withdrawal request.
+     */
+    async processArixWithdrawal(userWalletAddress, amount, recipientAddress) {
+        const client = await db.getClient();
+        try {
+            await client.query('BEGIN');
+
+            const userResult = await client.query("SELECT * FROM users WHERE wallet_address = $1 FOR UPDATE", [userWalletAddress]);
+            if (userResult.rows.length === 0) {
+                throw new Error("User not found");
+            }
+
+            const user = userResult.rows[0];
+            const currentBalance = parseFloat(user.balance);
+            const withdrawalAmount = parseFloat(amount);
+
+            if (currentBalance < withdrawalAmount) {
+                throw new Error("Insufficient ARIX balance");
+            }
+
+            const newBalance = currentBalance - withdrawalAmount;
+            await client.query("UPDATE users SET balance = $1, updated_at = NOW() WHERE wallet_address = $2", [newBalance, userWalletAddress]);
+
+            await client.query(
+                `INSERT INTO transactions (user_wallet_address, type, amount, asset, status, created_at, metadata) 
+                 VALUES ($1, 'withdrawal', $2, 'ARIX', 'pending', NOW(), $3)`,
+                [userWalletAddress, -withdrawalAmount, JSON.stringify({ recipient: recipientAddress })]
+            );
+
+            const memo = `ARIX withdrawal from ARIX Terminal. User: ${userWalletAddress}`;
+            const { seqno } = await sendArixJettons(recipientAddress, withdrawalAmount, memo);
+
+            await client.query("UPDATE transactions SET status = 'completed', external_tx_id = $1 WHERE user_wallet_address = $2 AND type = 'withdrawal' AND status = 'pending'", [seqno.toString(), userWalletAddress]);
+            
+            await client.query('COMMIT');
+
+            return { success: true, message: "Withdrawal initiated successfully.", newBalance: newBalance.toFixed(ARIX_DECIMALS) };
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error("Withdrawal processing failed:", error);
+            throw new Error("Withdrawal failed: " + error.message);
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * [NEW] Credits a user's balance after an on-chain deposit is confirmed.
+     */
+    async creditArixDeposit(userWalletAddress, amount, txHash) {
+        const client = await db.getClient();
+        try {
+            await client.query('BEGIN');
+
+            const existingTx = await client.query("SELECT id FROM transactions WHERE external_tx_id = $1 AND type = 'deposit'", [txHash]);
+            if (existingTx.rows.length > 0) {
+                console.log(`Deposit with hash ${txHash} has already been processed. Skipping.`);
+                await client.query('ROLLBACK');
+                return { success: false, message: "Deposit already processed." };
+            }
+
+            const user = await client.query("SELECT * FROM users WHERE wallet_address = $1 FOR UPDATE", [userWalletAddress]);
+            if (user.rows.length === 0) {
+                // Optionally, create the user if they don't exist
+                console.warn(`User ${userWalletAddress} not found for deposit. Creating now.`);
+                await this.ensureUserExists(userWalletAddress); 
+                // re-fetch after creation
+                 const newUser = await client.query("SELECT * FROM users WHERE wallet_address = $1 FOR UPDATE", [userWalletAddress]);
+                 user.rows.push(newUser.rows[0]);
+            }
+
+            const depositAmount = parseFloat(amount);
+            const newBalance = parseFloat(user.rows[0].balance) + depositAmount;
+
+            await client.query("UPDATE users SET balance = $1, updated_at = NOW() WHERE wallet_address = $2", [newBalance, userWalletAddress]);
+            
+            await client.query(
+                `INSERT INTO transactions (user_wallet_address, type, amount, asset, status, external_tx_id, created_at)
+                 VALUES ($1, 'deposit', $2, 'ARIX', 'completed', $3, NOW())`,
+                [userWalletAddress, depositAmount, txHash]
+            );
+
+            await client.query('COMMIT');
+            console.log(`Successfully credited ${depositAmount} ARIX to ${userWalletAddress}.`);
+            return { success: true, newBalance };
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error(`Crediting deposit for user ${userWalletAddress} failed:`, error);
+            throw error;
+        } finally {
+            client.release();
         }
     }
 
