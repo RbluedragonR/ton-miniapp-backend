@@ -1,8 +1,12 @@
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
-
+# Railway.toml
+#
 [deploy]
 startCommand = "npm start"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+
+# This section is CRITICAL to prevent the build from failing.
+# It tells Nixpacks to skip the automatic "npm run migrate" command.
+[release]
+command = "echo 'Skipping default Nixpacks release command.'"
+

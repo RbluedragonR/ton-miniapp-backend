@@ -1,51 +1,55 @@
+// src/config/database.js
+
 const { Pool } = require('pg');
 
-if (!process.env.POSTGRES_URL) {
-  if (process.env.NODE_ENV !== 'test') { 
-    console.warn("DATABASE_WARNING: POSTGRES_URL environment variable is not set. Database functionality will be unavailable.");
-  }
+// server.js handles loading .env for local development.
+// On Railway, this is now the correct, hardcoded private URL you set in the dashboard.
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+    console.error("FATAL ERROR: DATABASE_URL is not set in environment variables.");
+    process.exit(1);
 }
 
-const pool = process.env.POSTGRES_URL ? new Pool({
-  connectionString: process.env.POSTGRES_URL,
+const pool = new Pool({
+  connectionString: connectionString,
   ssl: {
     rejectUnauthorized: false
-  }
-}) : null;
+  },
+  max: 15,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+console.log('[Database] Pool configured. Verifying connection...');
+
+// A simple connection test to confirm everything is working on startup.
+pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+        console.error('--- FATAL DATABASE CONNECTION FAILED ---');
+        console.error(err);
+        // In a real scenario, you might want the app to exit if it can't connect.
+        // process.exit(1);
+    } else {
+        console.log('[Database] Connection successful.');
+    }
+});
 
 
-async function testDbConnection() {
-  if (!pool) {
-    console.log("DB: Pool is not initialized (POSTGRES_URL not set). Skipping DB connection test.");
-    return;
-  }
+async function query(text, params) {
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
-    console.log("DB: Successfully connected to PostgreSQL!");
-    const res = await client.query('SELECT NOW()');
-    console.log("DB: Current time from DB:", res.rows[0].now);
+    return await client.query(text, params);
+  } finally {
     client.release();
-  } catch (err) {
-    console.error("DB_ERROR: Failed to connect to PostgreSQL or execute query:", err.stack);
   }
 }
 
-
-
-
-
+async function getClient() {
+  return await pool.connect();
+}
 
 module.exports = {
-  query: (text, params) => {
-    if (!pool) {
-      throw new Error("Database pool is not initialized. POSTGRES_URL environment variable might be missing.");
-    }
-    return pool.query(text, params);
-  },
-  getClient: () => {
-    if (!pool) {
-      throw new Error("Database pool is not initialized. POSTGRES_URL environment variable might be missing.");
-    }
-    return pool.connect();
-  }
+  query,
+  getClient,
 };

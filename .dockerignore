@@ -1,0 +1,15 @@
+# .dockerignore
+
+# Ignore local environment file
+.env
+
+# Ignore node modules (they are installed on the server)
+node_modules
+
+# Ignore logs and npm debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore OS-specific files
+.DS_Store

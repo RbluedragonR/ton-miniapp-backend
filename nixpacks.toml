@@ -1,0 +1,8 @@
+# This file tells Nixpacks to skip the default release command.
+[phases.release]
+cmds = ["echo 'Skipping default Nixpacks release command.'"]
+
+# This tells Nixpacks what to do to start the app.
+[start]
+cmd = "npm start"
+
