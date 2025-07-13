@@ -5,12 +5,12 @@ const earnService = require('../services/earnService');
 const priceService = require('../services/priceService');
 const { Address } = require('@ton/core');
 const {
-    ARIX_TOKEN_MASTER_ADDRESS,
+    OXYBLE_TOKEN_MASTER_ADDRESS,
     STAKING_CONTRACT_ADDRESS,
     STAKING_CONTRACT_JETTON_WALLET_ADDRESS,
     USDT_JETTON_MASTER_ADDRESS,
 } = require('../config/envConfig');
-const { ARIX_DECIMALS, USDT_DECIMALS } = require('../utils/constants');
+const { OXYBLE_DECIMALS, USDT_DECIMALS } = require('../utils/constants');
 
 const isValidTonAddress = (addr) => {
     if (!addr) return false;
@@ -31,8 +31,8 @@ exports.getStakingConfig = async (req, res, next) => {
             stakingContractAddress: STAKING_CONTRACT_ADDRESS,
             stakingContractJettonWalletAddress: STAKING_CONTRACT_JETTON_WALLET_ADDRESS,
             arxToken: {
-                masterAddress: ARIX_TOKEN_MASTER_ADDRESS,
-                decimals: ARIX_DECIMALS,
+                masterAddress: OXYBLE_TOKEN_MASTER_ADDRESS,
+                decimals: OXYBLE_DECIMALS,
             },
             usdtToken: {
                 masterAddress: USDT_JETTON_MASTER_ADDRESS,
@@ -44,7 +44,7 @@ exports.getStakingConfig = async (req, res, next) => {
                 title: p.title,
                 durationDays: parseInt(p.duration_days, 10),
                 fixedUsdtAprPercent: parseFloat(p.fixed_usdt_apr_percent).toFixed(2),
-                arixEarlyUnstakePenaltyPercent: parseFloat(p.arix_early_unstake_penalty_percent).toFixed(2),
+                OXYBLEEarlyUnstakePenaltyPercent: parseFloat(p.OXYBLE_early_unstake_penalty_percent).toFixed(2),
                 minStakeUsdt: parseFloat(p.min_stake_usdt).toFixed(2),
                 maxStakeUsdt: p.max_stake_usdt ? parseFloat(p.max_stake_usdt).toFixed(2) : null,
                 referralL1InvestPercent: parseFloat(p.referral_l1_invest_percent).toFixed(2),
@@ -61,15 +61,15 @@ exports.getStakingConfig = async (req, res, next) => {
 };
 
 /**
- * [NEW] Controller to fetch the ARIX price.
+ * [NEW] Controller to fetch the OXYBLE price.
  * This provides a dedicated endpoint for the frontend.
  */
-exports.getArixPrice = async (req, res, next) => {
+exports.getOXYBLEPrice = async (req, res, next) => {
     try {
         const price = await priceService.getArxUsdtPrice();
         res.status(200).json({ price });
     } catch (error) {
-        console.error("CTRL: Error in getArixPrice:", error);
+        console.error("CTRL: Error in getOXYBLEPrice:", error);
         next(error);
     }
 };
@@ -78,12 +78,12 @@ exports.getArixPrice = async (req, res, next) => {
 exports.recordUserStake = async (req, res, next) => {
     try {
         const {
-            planKey, arixAmount, userWalletAddress,
+            planKey, OXYBLEAmount, userWalletAddress,
             transactionBoc, transactionHash, stakeUUID,
             referenceUsdtValue, referrerCodeOrAddress
         } = req.body;
 
-        if (!planKey || !arixAmount || !userWalletAddress || !transactionBoc || !referenceUsdtValue || !transactionHash || !stakeUUID) {
+        if (!planKey || !OXYBLEAmount || !userWalletAddress || !transactionBoc || !referenceUsdtValue || !transactionHash || !stakeUUID) {
             return res.status(400).json({ message: "Missing required stake information." });
         }
         if (!isValidTonAddress(userWalletAddress)) {
@@ -93,9 +93,9 @@ exports.recordUserStake = async (req, res, next) => {
             return res.status(400).json({ message: "Invalid referrer format." });
         }
 
-        const numericArixAmount = parseFloat(arixAmount);
-        if (isNaN(numericArixAmount) || numericArixAmount <= 0) {
-            return res.status(400).json({ message: "Invalid ARIX amount."});
+        const numericOXYBLEAmount = parseFloat(OXYBLEAmount);
+        if (isNaN(numericOXYBLEAmount) || numericOXYBLEAmount <= 0) {
+            return res.status(400).json({ message: "Invalid OXYBLE amount."});
         }
         const numericReferenceUsdtValue = parseFloat(referenceUsdtValue);
         if (isNaN(numericReferenceUsdtValue) || numericReferenceUsdtValue <= 0) {
@@ -104,7 +104,7 @@ exports.recordUserStake = async (req, res, next) => {
 
         const newStake = await earnService.createStake({
             planKey,
-            arixAmount: numericArixAmount,
+            OXYBLEAmount: numericOXYBLEAmount,
             userWalletAddress,
             transactionBoc,
             transactionHash,
@@ -114,7 +114,7 @@ exports.recordUserStake = async (req, res, next) => {
         });
 
         res.status(201).json({
-            message: "ARIX Stake recorded. Awaiting on-chain confirmation. USDT rewards will accrue monthly once active.",
+            message: "OXYBLE Stake recorded. Awaiting on-chain confirmation. USDT rewards will accrue monthly once active.",
             stake: newStake
         });
     } catch (error) {
@@ -142,16 +142,16 @@ exports.getUserStakesAndRewards = async (req, res, next) => {
     }
 };
 
-exports.initiateArixUnstake = async (req, res, next) => {
+exports.initiateOXYBLEUnstake = async (req, res, next) => {
     try {
         const { userWalletAddress, stakeId } = req.body;
         if (!isValidTonAddress(userWalletAddress) || !stakeId) {
             return res.status(400).json({ message: "Valid userWalletAddress and stakeId are required." });
         }
-        const unstakePreparationDetails = await earnService.prepareArixUnstake(userWalletAddress, stakeId);
+        const unstakePreparationDetails = await earnService.prepareOXYBLEUnstake(userWalletAddress, stakeId);
         res.status(200).json(unstakePreparationDetails);
     } catch (error) {
-        console.error("CTRL: Error in initiateArixUnstake:", error.message);
+        console.error("CTRL: Error in initiateOXYBLEUnstake:", error.message);
         if (error.message.includes("not found") || error.message.includes("not active")) {
             return res.status(400).json({ message: error.message });
         }
@@ -159,18 +159,18 @@ exports.initiateArixUnstake = async (req, res, next) => {
     }
 };
 
-exports.confirmArixUnstake = async (req, res, next) => {
+exports.confirmOXYBLEUnstake = async (req, res, next) => {
     try {
         const { userWalletAddress, stakeId, unstakeTransactionBoc, unstakeTransactionHash } = req.body;
         if (!isValidTonAddress(userWalletAddress) || !stakeId || !unstakeTransactionBoc || !unstakeTransactionHash) {
-            return res.status(400).json({ message: "Missing required ARIX unstake confirmation information." });
+            return res.status(400).json({ message: "Missing required OXYBLE unstake confirmation information." });
         }
-        const result = await earnService.finalizeArixUnstake({
+        const result = await earnService.finalizeOXYBLEUnstake({
             userWalletAddress, stakeId, unstakeTransactionBoc, unstakeTransactionHash
         });
         res.status(200).json(result);
     } catch (error) {
-        console.error("CTRL: Error in confirmArixUnstake:", error.message);
+        console.error("CTRL: Error in confirmOXYBLEUnstake:", error.message);
         if (error.message.includes("not found") || error.message.includes("does not allow") || error.message.includes("required")) {
             return res.status(400).json({ message: error.message });
         }
@@ -195,17 +195,17 @@ exports.requestUsdtWithdrawal = async (req, res, next) => {
     }
 };
 
-exports.requestArixRewardWithdrawal = async (req, res, next) => {
+exports.requestOXYBLERewardWithdrawal = async (req, res, next) => {
     try {
-        const { userWalletAddress, amountArix } = req.body;
-        if (!isValidTonAddress(userWalletAddress) || !amountArix || parseFloat(amountArix) <= 0) {
-            return res.status(400).json({ message: "Valid userWalletAddress and positive ARIX amount are required."});
+        const { userWalletAddress, amountOXYBLE } = req.body;
+        if (!isValidTonAddress(userWalletAddress) || !amountOXYBLE || parseFloat(amountOXYBLE) <= 0) {
+            return res.status(400).json({ message: "Valid userWalletAddress and positive OXYBLE amount are required."});
         }
-        const withdrawalResult = await earnService.processArixRewardWithdrawalRequest(userWalletAddress, parseFloat(amountArix));
+        const withdrawalResult = await earnService.processOXYBLERewardWithdrawalRequest(userWalletAddress, parseFloat(amountOXYBLE));
         res.status(200).json(withdrawalResult);
     } catch (error) {
-        console.error("CTRL: Error in requestArixRewardWithdrawal:", error.message);
-        if (error.message.includes("Minimum ARIX withdrawal") || error.message.includes("Insufficient claimable ARIX")) {
+        console.error("CTRL: Error in requestOXYBLERewardWithdrawal:", error.message);
+        if (error.message.includes("Minimum OXYBLE withdrawal") || error.message.includes("Insufficient claimable OXYBLE")) {
             return res.status(400).json({ message: error.message });
         }
         next(error);

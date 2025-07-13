@@ -75,15 +75,15 @@ app.use('/api/swap', swapRoutes);
 app.use('/api/game', gameRoutes);
 // app.use('/api/announcements', announcementRoutes);
 
-// --- Telegram Webhook ---
+// --- Telegram Webhook for Telegraf ---
 app.post(`/telegram-webhook-${process.env.TELEGRAM_BOT_TOKEN}`, (req, res) => {
-    botService.bot.processUpdate(req.body);
-    res.sendStatus(200);
+    // Use Telegraf's webhook middleware
+    botService.bot.handleUpdate(req.body, res);
 });
 
 // --- Root Endpoint ---
 app.get('/', (req, res) => {
-    res.send('ARIX Terminal Backend is running.');
+    res.send('OXYBLE Terminal Backend is running.');
 });
 
 // --- Error Handling ---
@@ -95,6 +95,6 @@ app.use((err, req, res, next) => {
 // --- Server Startup ---
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`[ARIX Final Build] Server starting...`);
+    console.log(`[OXYBLE Final Build] Server starting...`);
     console.log(`[Server] Listening on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
 });

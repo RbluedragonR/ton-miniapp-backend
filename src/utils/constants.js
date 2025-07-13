@@ -40,7 +40,7 @@ const PLINKO_MULTIPLIERS = {
 };
 
 // --- On-Chain & Token Specific Constants ---
-const ARIX_DECIMALS = 9;
+const OXYBLE_DECIMALS = 9;
 const USDT_DECIMALS = 6; // Standard for jUSDT or most USDT variants
 const USD_DECIMALS = 2; // For displaying USD values if needed in logs/admin
 
@@ -62,7 +62,7 @@ const OP_JETTON_TRANSFER_NOTIFICATION = 0x7362d09c;
 module.exports = {
   BOT_COMMANDS,
   PLINKO_MULTIPLIERS,
-  ARIX_DECIMALS,
+  OXYBLE_DECIMALS,
   USDT_DECIMALS,
   USD_DECIMALS,
   TON_TRANSACTION_FEES,

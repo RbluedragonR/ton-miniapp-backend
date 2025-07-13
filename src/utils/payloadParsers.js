@@ -8,8 +8,8 @@ const { Address, Slice } = require('@ton/ton'); // Assuming Slice is available o
  * query_id: Int as uint64;
  * stake_identifier: Int as uint64; // Unique ID for the stake on SC, derived from DB UUID
  * duration_seconds: Int as uint32;
- * arix_lock_apr_bps: Int as uint16; // Or other ARIX-specific lock terms
- * arix_lock_penalty_bps: Int as uint16;
+ * OXYBLE_lock_apr_bps: Int as uint16; // Or other OXYBLE-specific lock terms
+ * OXYBLE_lock_penalty_bps: Int as uint16;
  * }
  * @param {Slice} forwardPayloadSlice - The slice of the forward_payload cell.
  * @returns {object|null} Parsed parameters or null on error.
@@ -27,10 +27,10 @@ function parseStakeParametersFromForwardPayload(forwardPayloadSlice) {
         const queryId = forwardPayloadSlice.loadUintBig(64);
         const stakeIdentifier = forwardPayloadSlice.loadUintBig(64); // This should match the one sent by frontend/backend
         const durationSeconds = forwardPayloadSlice.loadUint(32);
-        const arixLockAprBps = forwardPayloadSlice.loadUint(16); // Or however your SC defines it
-        const arixLockPenaltyBps = forwardPayloadSlice.loadUint(16); // Or however your SC defines it
+        const OXYBLELockAprBps = forwardPayloadSlice.loadUint(16); // Or however your SC defines it
+        const OXYBLELockPenaltyBps = forwardPayloadSlice.loadUint(16); // Or however your SC defines it
 
-        return { queryId, stakeIdentifier, durationSeconds, arixLockAprBps, arixLockPenaltyBps };
+        return { queryId, stakeIdentifier, durationSeconds, OXYBLELockAprBps, OXYBLELockPenaltyBps };
     } catch (e) {
         console.error("Failed to parse StakeParametersFromUser from forward_payload:", e.message);
         return null;
@@ -44,9 +44,9 @@ function parseStakeParametersFromForwardPayload(forwardPayloadSlice) {
  * query_id: Int as uint64;
  * staker_address: Address;
  * stake_identifier_processed: Int as uint64;
- * final_arix_amount_returned: Coins;
- * arix_lock_reward_paid: Coins; // ARIX reward from the SC lock itself
- * arix_penalty_applied: Coins;  // ARIX penalty applied by the SC
+ * final_OXYBLE_amount_returned: Coins;
+ * OXYBLE_lock_reward_paid: Coins; // OXYBLE reward from the SC lock itself
+ * OXYBLE_penalty_applied: Coins;  // OXYBLE penalty applied by the SC
  * }
  * @param {Slice} payloadSlice - The slice of the payload cell from the SC's Jetton Wallet transfer.
  * @returns {object|null} Parsed parameters or null on error.
@@ -63,17 +63,17 @@ function parseUnstakeResponsePayload(payloadSlice) {
         const queryId = payloadSlice.loadUintBig(64);
         const stakerAddress = payloadSlice.loadAddress();
         const stakeIdentifierProcessed = payloadSlice.loadUintBig(64);
-        const finalArixAmountReturned = payloadSlice.loadCoins();
-        const arixLockRewardPaid = payloadSlice.loadCoins();
-        const arixPenaltyApplied = payloadSlice.loadCoins();
+        const finalOXYBLEAmountReturned = payloadSlice.loadCoins();
+        const OXYBLELockRewardPaid = payloadSlice.loadCoins();
+        const OXYBLEPenaltyApplied = payloadSlice.loadCoins();
 
         return {
             queryId,
             stakerAddress,
             stakeIdentifierProcessed,
-            finalArixAmountReturned,
-            arixLockRewardPaid,
-            arixPenaltyApplied
+            finalOXYBLEAmountReturned,
+            OXYBLELockRewardPaid,
+            OXYBLEPenaltyApplied
         };
     } catch (e) {
         console.error("Failed to parse UnstakeResponsePayload from forward_payload:", e.message);

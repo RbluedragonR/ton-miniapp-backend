@@ -184,7 +184,7 @@ class CrashGameEngine extends EventEmitter {
         this.gameLoopTimeout = setTimeout(this.startWaitingPhase, CRASHED_TIME_MS);
     }
     
-    async handlePlaceBet({ userWalletAddress, betAmountArix, autoCashoutAt }) {
+    async handlePlaceBet({ userWalletAddress, betAmountOXYBLE, autoCashoutAt }) {
         if (this.phase !== 'WAITING') return { success: false, message: "Bets are closed for this round." };
         if (!this.gameId) return { success: false, message: "Game not ready, please try again."};
         if (this.players[userWalletAddress]) return { success: false, message: "You have already placed a bet." };
@@ -194,12 +194,12 @@ class CrashGameEngine extends EventEmitter {
             await client.query('BEGIN');
             
             // This service handles its own transaction logic internally
-            await userService.updateUserBalances(userWalletAddress, { ARIX: -betAmountArix }, 'game_bet', { game: 'crash', game_id: this.gameId }, client);
+            await userService.updateUserBalances(userWalletAddress, { OXYBLE: -betAmountOXYBLE }, 'game_bet', { game: 'crash', game_id: this.gameId }, client);
 
-            await client.query("INSERT INTO crash_bets (game_id, user_wallet_address, bet_amount_arix, status, placed_at) VALUES ($1, $2, $3, 'placed', NOW())", [ this.gameId, userWalletAddress, betAmountArix ]);
+            await client.query("INSERT INTO crash_bets (game_id, user_wallet_address, bet_amount_OXYBLE, status, placed_at) VALUES ($1, $2, $3, 'placed', NOW())", [ this.gameId, userWalletAddress, betAmountOXYBLE ]);
             
             await client.query('COMMIT');
-            this.players[userWalletAddress] = { betAmount: betAmountArix, status: 'placed', autoCashoutAt };
+            this.players[userWalletAddress] = { betAmount: betAmountOXYBLE, status: 'placed', autoCashoutAt };
             this.broadcastState();
             return { success: true, message: 'Bet placed!' };
         } catch (e) {
@@ -219,24 +219,24 @@ class CrashGameEngine extends EventEmitter {
         
         const player = this.players[userWalletAddress];
         const cashOutMultiplier = this.multiplier;
-        const payoutArix = parseFloat((player.betAmount * cashOutMultiplier).toFixed(9));
+        const payoutOXYBLE = parseFloat((player.betAmount * cashOutMultiplier).toFixed(9));
 
         const client = await getClient();
         try {
             await client.query('BEGIN');
             
-            await userService.updateUserBalances(userWalletAddress, { ARIX: payoutArix }, 'game_win', { game: 'crash', game_id: this.gameId, multiplier: cashOutMultiplier }, client);
+            await userService.updateUserBalances(userWalletAddress, { OXYBLE: payoutOXYBLE }, 'game_win', { game: 'crash', game_id: this.gameId, multiplier: cashOutMultiplier }, client);
 
-            await client.query("UPDATE crash_bets SET status = 'cashed_out', cash_out_multiplier = $1, payout_arix = $2 WHERE game_id = $3 AND user_wallet_address = $4", [cashOutMultiplier, payoutArix, this.gameId, userWalletAddress]);
+            await client.query("UPDATE crash_bets SET status = 'cashed_out', cash_out_multiplier = $1, payout_OXYBLE = $2 WHERE game_id = $3 AND user_wallet_address = $4", [cashOutMultiplier, payoutOXYBLE, this.gameId, userWalletAddress]);
             
             await client.query('COMMIT');
 
             player.status = 'cashed_out';
-            player.payout = payoutArix;
+            player.payout = payoutOXYBLE;
             player.cashOutAt = cashOutMultiplier;
             this.broadcastState();
 
-            return { success: true, message: 'Cashed out!', cashOutMultiplier, payoutArix };
+            return { success: true, message: 'Cashed out!', cashOutMultiplier, payoutOXYBLE };
         } catch (e) {
             await client.query('ROLLBACK');
             console.error(`[CrashEngine] Cash out failed for ${userWalletAddress}:`, e.message);
@@ -272,7 +272,7 @@ class CrashGameEngine extends EventEmitter {
             // Format player list for the frontend
             players: Object.entries(this.players).map(([address, data]) => ({ 
                 user_wallet_address: address, 
-                bet_amount_arix: data.betAmount, 
+                bet_amount_OXYBLE: data.betAmount, 
                 status: data.status, 
                 cash_out_multiplier: data.cashOutAt,
                 payout: data.payout // Include payout amount
@@ -283,7 +283,7 @@ class CrashGameEngine extends EventEmitter {
     }
     
     _calculateCrashPoint(serverSeed) {
-        const hash = crypto.createHmac('sha256', serverSeed).update('ARIX_TERMINAL_PROVABLY_FAIR_SALT').digest('hex');
+        const hash = crypto.createHmac('sha256', serverSeed).update('OXYBLE_TERMINAL_PROVABLY_FAIR_SALT').digest('hex');
         const h = parseInt(hash.slice(0, 13), 16);
         const e = 2 ** 52;
         if (h % 33 === 0) return 1.00;

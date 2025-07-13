@@ -4,21 +4,21 @@ const axios = require('axios');
 
 
 
-const ARIX_TOKEN_MASTER_ADDRESS = "EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd";
+const OXYBLE_TOKEN_MASTER_ADDRESS = "EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd";
 
 const STONFI_API_BASE_URL = "https://api.ston.fi/v1";
 
 class PriceService {
     async getArxUsdtPrice() {
         
-        console.log("[PriceService] Using ARIX_TOKEN_MASTER_ADDRESS:", ARIX_TOKEN_MASTER_ADDRESS);
+        console.log("[PriceService] Using OXYBLE_TOKEN_MASTER_ADDRESS:", OXYBLE_TOKEN_MASTER_ADDRESS);
 
-        if (!ARIX_TOKEN_MASTER_ADDRESS || typeof ARIX_TOKEN_MASTER_ADDRESS !== 'string' || ARIX_TOKEN_MASTER_ADDRESS.trim() === "") {
-            console.error("PriceService: ARIX_TOKEN_MASTER_ADDRESS is invalid or effectively not set (even if hardcoded). Value:", `"${ARIX_TOKEN_MASTER_ADDRESS}"`);
+        if (!OXYBLE_TOKEN_MASTER_ADDRESS || typeof OXYBLE_TOKEN_MASTER_ADDRESS !== 'string' || OXYBLE_TOKEN_MASTER_ADDRESS.trim() === "") {
+            console.error("PriceService: OXYBLE_TOKEN_MASTER_ADDRESS is invalid or effectively not set (even if hardcoded). Value:", `"${OXYBLE_TOKEN_MASTER_ADDRESS}"`);
             return null;
         }
 
-        const apiUrl = `${STONFI_API_BASE_URL}/assets/${ARIX_TOKEN_MASTER_ADDRESS.trim()}`;
+        const apiUrl = `${STONFI_API_BASE_URL}/assets/${OXYBLE_TOKEN_MASTER_ADDRESS.trim()}`;
         console.log("[PriceService] Attempting to fetch price from URL:", apiUrl);
 
         try {
@@ -39,11 +39,11 @@ class PriceService {
                 console.log("[PriceService] Successfully fetched and parsed price:", price);
                 return price;
             } else {
-                console.warn("PriceService: Could not extract ARIX price from STON.fi response structure. Full response:", JSON.stringify(response.data, null, 2));
+                console.warn("PriceService: Could not extract OXYBLE price from STON.fi response structure. Full response:", JSON.stringify(response.data, null, 2));
                 return null; 
             }
         } catch (error) {
-            console.error(`PriceService: Error fetching ARIX/USDT price from ${apiUrl}. Error:`, error.message);
+            console.error(`PriceService: Error fetching OXYBLE/USDT price from ${apiUrl}. Error:`, error.message);
             if (error.isAxiosError && error.response) {
                 console.error("PriceService: STON.fi API Error Response Status:", error.response.status);
                 console.error("PriceService: STON.fi API Error Response Data:", JSON.stringify(error.response.data, null, 2));

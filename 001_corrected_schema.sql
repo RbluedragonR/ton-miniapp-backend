@@ -5,7 +5,7 @@
 DROP TABLE IF EXISTS announcements CASCADE;
 DROP TABLE IF EXISTS referral_rewards CASCADE;
 DROP TABLE IF EXISTS user_usdt_withdrawals CASCADE;
-DROP TABLE IF EXISTS user_arix_withdrawals CASCADE;
+DROP TABLE IF EXISTS user_OXYBLE_withdrawals CASCADE;
 DROP TABLE IF EXISTS user_task_completions CASCADE;
 DROP TABLE IF EXISTS tasks CASCADE;
 DROP TABLE IF EXISTS coinflip_history CASCADE;
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS users (
     referral_code VARCHAR(10) UNIQUE,
     referrer_wallet_address VARCHAR(68) REFERENCES users(wallet_address) ON DELETE SET NULL,
     claimable_usdt_balance NUMERIC(20, 6) NOT NULL DEFAULT 0.00,
-    claimable_arix_rewards NUMERIC(20, 9) NOT NULL DEFAULT 0.00,
+    claimable_OXYBLE_rewards NUMERIC(20, 9) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS staking_plans (
     title VARCHAR(100) NOT NULL,
     duration_days INT NOT NULL,
     fixed_usdt_apr_percent NUMERIC(5, 2) NOT NULL,
-    arix_early_unstake_penalty_percent NUMERIC(5, 2) NOT NULL,
+    OXYBLE_early_unstake_penalty_percent NUMERIC(5, 2) NOT NULL,
     min_stake_usdt NUMERIC(10, 2) DEFAULT 0,
     max_stake_usdt NUMERIC(10, 2),
     referral_l1_invest_percent NUMERIC(5, 2) DEFAULT 0,
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS user_stakes (
     stake_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_wallet_address VARCHAR(68) NOT NULL REFERENCES users(wallet_address),
     staking_plan_id INT NOT NULL REFERENCES staking_plans(plan_id),
-    arix_amount_staked NUMERIC(20, 9) NOT NULL,
+    OXYBLE_amount_staked NUMERIC(20, 9) NOT NULL,
     reference_usdt_value_at_stake_time NUMERIC(20, 6) NOT NULL,
     stake_timestamp TIMESTAMPTZ NOT NULL,
     unlock_timestamp TIMESTAMPTZ NOT NULL,
@@ -99,8 +99,8 @@ CREATE TABLE IF NOT EXISTS user_stakes (
     status VARCHAR(30) NOT NULL DEFAULT 'pending_confirmation',
     usdt_reward_accrued_total NUMERIC(20, 6) DEFAULT 0.00,
     last_usdt_reward_calc_timestamp TIMESTAMPTZ,
-    arix_penalty_applied NUMERIC(20, 9) DEFAULT 0.00,
-    arix_final_reward_calculated NUMERIC(20, 9) DEFAULT 0.00,
+    OXYBLE_penalty_applied NUMERIC(20, 9) DEFAULT 0.00,
+    OXYBLE_final_reward_calculated NUMERIC(20, 9) DEFAULT 0.00,
     onchain_unstake_tx_boc TEXT,
     onchain_unstake_tx_hash VARCHAR(64) UNIQUE,
     notes TEXT,
@@ -139,11 +139,11 @@ CREATE TABLE IF NOT EXISTS crash_rounds (
 CREATE TABLE IF NOT EXISTS coinflip_history (
     game_id SERIAL PRIMARY KEY,
     user_wallet_address VARCHAR(68) NOT NULL REFERENCES users(wallet_address),
-    bet_amount_arix NUMERIC(20, 9) NOT NULL,
+    bet_amount_OXYBLE NUMERIC(20, 9) NOT NULL,
     choice VARCHAR(10) NOT NULL,
     server_coin_side VARCHAR(10) NOT NULL,
     outcome VARCHAR(10) NOT NULL,
-    amount_delta_arix NUMERIC(20, 9) NOT NULL,
+    amount_delta_OXYBLE NUMERIC(20, 9) NOT NULL,
     played_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_coinflip_history_user ON coinflip_history(user_wallet_address);
@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     task_key VARCHAR(50) UNIQUE NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    reward_arix_amount NUMERIC(20, 9) DEFAULT 0,
+    reward_OXYBLE_amount NUMERIC(20, 9) DEFAULT 0,
     task_type VARCHAR(50) DEFAULT 'social',
     validation_type VARCHAR(50) DEFAULT 'manual',
     action_url TEXT,
@@ -182,10 +182,10 @@ CREATE INDEX IF NOT EXISTS idx_user_task_completions_user_task ON user_task_comp
 CREATE INDEX IF NOT EXISTS idx_user_task_completions_status ON user_task_completions(status);
 
 -- Withdrawals tables
-CREATE TABLE IF NOT EXISTS user_arix_withdrawals (
+CREATE TABLE IF NOT EXISTS user_OXYBLE_withdrawals (
     withdrawal_id SERIAL PRIMARY KEY,
     user_wallet_address character varying(68) NOT NULL,
-    amount_arix numeric(20,9) NOT NULL,
+    amount_OXYBLE numeric(20,9) NOT NULL,
     status character varying(20) DEFAULT 'pending_payout'::character varying NOT NULL,
     onchain_tx_hash character varying(64) UNIQUE,
     requested_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,

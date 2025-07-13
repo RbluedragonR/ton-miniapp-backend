@@ -34,7 +34,7 @@ COPY public.announcements (announcement_id, title, content, type, image_url, act
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.users (wallet_address, telegram_id, username, referral_code, referrer_wallet_address, created_at, updated_at, claimable_usdt_balance, claimable_arix_rewards) FROM stdin;
+COPY public.users (wallet_address, telegram_id, username, referral_code, referrer_wallet_address, created_at, updated_at, claimable_usdt_balance, claimable_OXYBLE_rewards) FROM stdin;
 0:43083987ff40670469d1483c27f99f31bd307d6ebebfdeab5b32e7b98d180d2d	\N	\N	PF7EIWXV	\N	2025-06-04 11:55:12.260376+00	2025-06-04 11:55:12.260376+00	0.000000	0.000000000
 0:d42060eeef8d8163c37d4d96a56dd3d6a9448ee71c0b87329f536c5a9c5ca321	691258888	babubig	CS6JJGPS	\N	2025-06-04 01:47:02.276714+00	2025-06-04 14:01:17.878099+00	0.000000	0.000000000
 0:67c517996903dce7917688ffdf9c3ba1702d5c90987cb94ed01908de554180e3	\N	\N	BHDANQHH	\N	2025-06-05 00:50:57.575671+00	2025-06-05 00:50:57.575671+00	0.000000	0.000000000
@@ -49,7 +49,7 @@ COPY public.users (wallet_address, telegram_id, username, referral_code, referre
 -- Data for Name: coinflip_history; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.coinflip_history (game_id, user_wallet_address, bet_amount_arix, choice, server_coin_side, outcome, amount_delta_arix, played_at) FROM stdin;
+COPY public.coinflip_history (game_id, user_wallet_address, bet_amount_OXYBLE, choice, server_coin_side, outcome, amount_delta_OXYBLE, played_at) FROM stdin;
 \.
 
 
@@ -75,7 +75,7 @@ COPY public.crash_rounds (id, crash_multiplier, server_seed, public_hash, status
 -- Data for Name: staking_plans; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.staking_plans (plan_id, plan_key, title, duration_days, fixed_usdt_apr_percent, arix_early_unstake_penalty_percent, min_stake_usdt, max_stake_usdt, referral_l1_invest_percent, referral_l2_invest_percent, referral_l2_commission_on_l1_bonus_percent, is_active, created_at) FROM stdin;
+COPY public.staking_plans (plan_id, plan_key, title, duration_days, fixed_usdt_apr_percent, OXYBLE_early_unstake_penalty_percent, min_stake_usdt, max_stake_usdt, referral_l1_invest_percent, referral_l2_invest_percent, referral_l2_commission_on_l1_bonus_percent, is_active, created_at) FROM stdin;
 1	STARTER	Starter Plan	30	6.00	7.00	100.00	500.00	5.00	1.00	0.00	t	2025-06-03 22:14:19.786755+00
 2	BUILDER	Builder Plan	60	7.50	7.00	500.00	1000.00	7.00	2.00	0.00	t	2025-06-03 22:14:19.786755+00
 3	ADVANCED	Advanced Plan	90	9.00	7.00	1000.00	5000.00	10.00	0.00	3.00	t	2025-06-03 22:14:19.786755+00
@@ -87,7 +87,7 @@ COPY public.staking_plans (plan_id, plan_key, title, duration_days, fixed_usdt_a
 -- Data for Name: user_stakes; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.user_stakes (stake_id, user_wallet_address, staking_plan_id, arix_amount_staked, reference_usdt_value_at_stake_time, stake_timestamp, unlock_timestamp, onchain_stake_tx_boc, onchain_stake_tx_hash, status, usdt_reward_accrued_total, last_usdt_reward_calc_timestamp, arix_penalty_applied, arix_final_reward_calculated, onchain_unstake_tx_boc, onchain_unstake_tx_hash, notes, created_at, updated_at) FROM stdin;
+COPY public.user_stakes (stake_id, user_wallet_address, staking_plan_id, OXYBLE_amount_staked, reference_usdt_value_at_stake_time, stake_timestamp, unlock_timestamp, onchain_stake_tx_boc, onchain_stake_tx_hash, status, usdt_reward_accrued_total, last_usdt_reward_calc_timestamp, OXYBLE_penalty_applied, OXYBLE_final_reward_calculated, onchain_unstake_tx_boc, onchain_unstake_tx_hash, notes, created_at, updated_at) FROM stdin;
 \.
 
 
@@ -103,18 +103,18 @@ COPY public.referral_rewards (reward_id, stake_id, referrer_wallet_address, refe
 -- Data for Name: tasks; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.tasks (task_id, task_key, title, description, reward_arix_amount, task_type, validation_type, action_url, is_active, is_repeatable, max_completions_user, start_date, end_date, created_at) FROM stdin;
-1	TWITTER_FOLLOW_ARIX	Follow ARIX on Twitter	Follow our official ARIX Twitter account and verify.	100.000000000	social	manual	https://twitter.com/ARIX_PROJECT_X	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
-2	TELEGRAM_JOIN_ARIX	Join ARIX Telegram Channel	Join our main Telegram channel for updates.	50.000000000	social	manual	https://t.me/ARIX_CHANEL	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
-3	FIRST_STAKE_BONUS	First Stake Bonus	Make your first ARIX stake on any plan and get a bonus!	200.000000000	engagement	auto_approve_on_stake	\N	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
+COPY public.tasks (task_id, task_key, title, description, reward_OXYBLE_amount, task_type, validation_type, action_url, is_active, is_repeatable, max_completions_user, start_date, end_date, created_at) FROM stdin;
+1	TWITTER_FOLLOW_OXYBLE	Follow OXYBLE on Twitter	Follow our official OXYBLE Twitter account and verify.	100.000000000	social	manual	https://twitter.com/OXYBLE_PROJECT_X	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
+2	TELEGRAM_JOIN_OXYBLE	Join OXYBLE Telegram Channel	Join our main Telegram channel for updates.	50.000000000	social	manual	https://t.me/OXYBLE_CHANEL	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
+3	FIRST_STAKE_BONUS	First Stake Bonus	Make your first OXYBLE stake on any plan and get a bonus!	200.000000000	engagement	auto_approve_on_stake	\N	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
 \.
 
 
 --
--- Data for Name: user_arix_withdrawals; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+-- Data for Name: user_OXYBLE_withdrawals; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.user_arix_withdrawals (withdrawal_id, user_wallet_address, amount_arix, status, onchain_tx_hash, requested_at, processed_at) FROM stdin;
+COPY public.user_OXYBLE_withdrawals (withdrawal_id, user_wallet_address, amount_OXYBLE, status, onchain_tx_hash, requested_at, processed_at) FROM stdin;
 \.
 
 

@@ -1,22 +1,22 @@
 /**
- * ar_backend/src/listeners/arixDepositListener.js
+ * ar_backend/src/listeners/OXYBLEDepositListener.js
  *
  * [FIXED VERSION]
- * This script runs as a standalone process to monitor the blockchain for incoming ARIX deposits
+ * This script runs as a standalone process to monitor the blockchain for incoming OXYBLE deposits
  * to the application's hot wallet.
  *
  * FIXED: Now reads environment variables directly from process.env instead of config file
  *
  * HOW IT WORKS:
- * 1. It gets the hot wallet's ARIX jetton wallet address.
+ * 1. It gets the hot wallet's OXYBLE jetton wallet address.
  * 2. It subscribes to all transactions for that jetton wallet address.
  * 3. When a transaction comes in, it parses the message body to find the amount and the memo.
  * 4. The memo *MUST* contain the depositor's wallet address for their account to be credited.
- * 5. It calls the `handleArixDeposit` controller function to process the deposit.
+ * 5. It calls the `handleOXYBLEDeposit` controller function to process the deposit.
  *
  * TO RUN:
  * You need to run this script as a background service on your server, alongside your main API server.
- * e.g., `node src/listeners/arixDepositListener.js`
+ * e.g., `node src/listeners/OXYBLEDepositListener.js`
  */
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
@@ -24,21 +24,21 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env'
 const { TonClient, Address, fromNano } = require("@ton/ton");
 const { getHttpEndpoint } = require("@orbs-network/ton-access");
 const { getJettonWalletAddress } = require('../utils/tonUtils');
-const { handleArixDeposit } = require('../controllers/userController');
+const { handleOXYBLEDeposit } = require('../controllers/userController');
 
 // FIXED: Read ALL environment variables directly from process.env (Railway)
 const HOT_WALLET_ADDRESS = process.env.HOT_WALLET_ADDRESS;
 const TON_NETWORK = process.env.TON_NETWORK || 'mainnet';
-const ARIX_TOKEN_MASTER_ADDRESS = process.env.ARIX_TOKEN_MASTER_ADDRESS;
+const OXYBLE_TOKEN_MASTER_ADDRESS = process.env.OXYBLE_TOKEN_MASTER_ADDRESS;
 
 // Debug: Log environment variables at startup
 console.log('=== ENVIRONMENT VARIABLES DEBUG ===');
 console.log('HOT_WALLET_ADDRESS:', HOT_WALLET_ADDRESS);
 console.log('TON_NETWORK:', TON_NETWORK);
-console.log('ARIX_TOKEN_MASTER_ADDRESS:', ARIX_TOKEN_MASTER_ADDRESS);
+console.log('OXYBLE_TOKEN_MASTER_ADDRESS:', OXYBLE_TOKEN_MASTER_ADDRESS);
 console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('All available env vars with WALLET or ARIX:');
-Object.keys(process.env).filter(key => key.includes('WALLET') || key.includes('ARIX')).forEach(key => {
+console.log('All available env vars with WALLET or OXYBLE:');
+Object.keys(process.env).filter(key => key.includes('WALLET') || key.includes('OXYBLE')).forEach(key => {
     console.log(`  ${key}: ${process.env[key]}`);
 });
 console.log('=== END DEBUG ===');
@@ -52,7 +52,7 @@ const isValidTonAddress = (addr) => {
     } catch (e) { return false; }
 };
 
-async function listenForArixDeposits() {
+async function listenForOXYBLEDeposits() {
     // Check all required environment variables
     if (!HOT_WALLET_ADDRESS) {
         console.error("FATAL: HOT_WALLET_ADDRESS is not defined in your environment variables. Listener cannot start.");
@@ -63,29 +63,29 @@ async function listenForArixDeposits() {
         return;
     }
     
-    if (!ARIX_TOKEN_MASTER_ADDRESS) {
-        console.error("FATAL: ARIX_TOKEN_MASTER_ADDRESS is not defined in your environment variables. Listener cannot start.");
-        console.error("Available environment variables containing 'ARIX' or 'TOKEN':");
-        Object.keys(process.env).filter(key => key.includes('ARIX') || key.includes('TOKEN')).forEach(key => {
+    if (!OXYBLE_TOKEN_MASTER_ADDRESS) {
+        console.error("FATAL: OXYBLE_TOKEN_MASTER_ADDRESS is not defined in your environment variables. Listener cannot start.");
+        console.error("Available environment variables containing 'OXYBLE' or 'TOKEN':");
+        Object.keys(process.env).filter(key => key.includes('OXYBLE') || key.includes('TOKEN')).forEach(key => {
             console.error(`  ${key}: ${process.env[key]}`);
         });
         return;
     }
 
-    console.log("Starting ARIX deposit listener...");
+    console.log("Starting OXYBLE deposit listener...");
     console.log(`Network: ${TON_NETWORK}`);
     console.log(`Hot Wallet: ${HOT_WALLET_ADDRESS}`);
     
     const endpoint = await getHttpEndpoint({ network: TON_NETWORK });
     const client = new TonClient({ endpoint });
 
-    const hotWalletJettonAddress = await getJettonWalletAddress(HOT_WALLET_ADDRESS, ARIX_TOKEN_MASTER_ADDRESS);
+    const hotWalletJettonAddress = await getJettonWalletAddress(HOT_WALLET_ADDRESS, OXYBLE_TOKEN_MASTER_ADDRESS);
     if (!hotWalletJettonAddress) {
         console.error(`Could not derive Jetton Wallet address for hot wallet ${HOT_WALLET_ADDRESS}. Exiting.`);
         return;
     }
 
-    console.log(`Listening for ARIX deposits on Jetton Wallet: ${hotWalletJettonAddress.toString({ testOnly: TON_NETWORK === 'testnet' })}`);
+    console.log(`Listening for OXYBLE deposits on Jetton Wallet: ${hotWalletJettonAddress.toString({ testOnly: TON_NETWORK === 'testnet' })}`);
 
     // Subscribe to transactions of the hot wallet's Jetton wallet
     // Note: This method is experimental in ton.js and might change.
@@ -137,12 +137,12 @@ async function listenForArixDeposits() {
 
                         if (memo && isValidTonAddress(memo)) {
                             console.log(`[DEPOSIT DETECTED]`);
-                            console.log(`  -> Amount: ${amount} ARIX`);
+                            console.log(`  -> Amount: ${amount} OXYBLE`);
                             console.log(`  -> From: ${fromAddress.toString({ testOnly: TON_NETWORK === 'testnet' })}`);
                             console.log(`  -> Memo (User Wallet): ${memo}`);
                             console.log(`  -> Tx Hash: ${tx.hash().toString('hex')}`);
 
-                            await handleArixDeposit({
+                            await handleOXYBLEDeposit({
                                 userWalletAddress: memo,
                                 amount: parseFloat(amount),
                                 txHash: tx.hash().toString('hex')
@@ -163,4 +163,4 @@ async function listenForArixDeposits() {
     }, 15000); // Poll every 15 seconds
 }
 
-listenForArixDeposits().catch(console.error);
+listenForOXYBLEDeposits().catch(console.error);

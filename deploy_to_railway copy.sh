@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ===================================================================================
-# ARIX - AUTOMATED DEPLOYMENT SCRIPT (v3.4)
+# OXYBLE - AUTOMATED DEPLOYMENT SCRIPT (v3.4)
 # ===================================================================================
 # This script handles the entire deployment process without user interaction.
 # It now includes a cleanup step to remove old/misspelled environment variables
@@ -26,7 +26,7 @@ RAILWAY_PROJECT_ID="42bb1cdd-7437-4092-82e1-93d44b5a1498"
 # DANGER: YOUR SECRET RECOVERY PHRASE IS HARDCODED BELOW.
 # THIS IS A MAJOR SECURITY RISK. DO NOT COMMIT THIS SCRIPT TO A PUBLIC REPOSITORY.
 TON_NETWORK_CONFIG="mainnet"
-ARIX_MASTER_ADDRESS="EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd" # NOTE: This is the TESTNET address. Replace with MAINNET address when known.
+OXYBLE_MASTER_ADDRESS="EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd" # NOTE: This is the TESTNET address. Replace with MAINNET address when known.
 HOT_WALLET_ADDRESS_CONFIG="UQAOsmO5jhlrmlWHsVn26WXt7MhllL7a7r-OEEEOQ-Uy_8ms"
 HOT_WALLET_MNEMONIC_CONFIG="wear obvious illegal worth edge crater scene grow stereo measure license leopard swim filter jump suffer athlete eye gift side rude iron quarter humble"
 
@@ -78,7 +78,7 @@ echo
 # --- Step 3: Set Environment Variables on Railway ---
 bold "Step 3: Setting environment variables on Railway..."
 # Using the correct Railway CLI syntax with --set flag
-railway variables --service "$BACKEND_SERVICE_NAME" --set "TON_NETWORK=$TON_NETWORK_CONFIG" --set "ARIX_TOKEN_MASTER_ADDRESS=$ARIX_MASTER_ADDRESS" --set "HOT_WALLET_ADDRESS=$HOT_WALLET_ADDRESS_CONFIG" --set "HOT_WALLET_MNEMONIC=$HOT_WALLET_MNEMONIC_CONFIG" --set "TRUST_PROXY=1"
+railway variables --service "$BACKEND_SERVICE_NAME" --set "TON_NETWORK=$TON_NETWORK_CONFIG" --set "OXYBLE_TOKEN_MASTER_ADDRESS=$OXYBLE_MASTER_ADDRESS" --set "HOT_WALLET_ADDRESS=$HOT_WALLET_ADDRESS_CONFIG" --set "HOT_WALLET_MNEMONIC=$HOT_WALLET_MNEMONIC_CONFIG" --set "TRUST_PROXY=1"
 
 green "✔ All environment variables have been set."
 echo

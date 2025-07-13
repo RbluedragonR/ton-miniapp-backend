@@ -16,17 +16,17 @@ const isValidTonAddress = (addr) => {
 // --- PRESERVED ORIGINAL METHODS ---
 exports.handleCoinflipBet = async (req, res, next) => {
     try {
-        const { userWalletAddress, betAmountArix, choice } = req.body;
+        const { userWalletAddress, betAmountOXYBLE, choice } = req.body;
 
-        if (!userWalletAddress || !betAmountArix || !choice) {
-            return res.status(400).json({ message: "Missing required bet information (userWalletAddress, betAmountArix, choice)." });
+        if (!userWalletAddress || !betAmountOXYBLE || !choice) {
+            return res.status(400).json({ message: "Missing required bet information (userWalletAddress, betAmountOXYBLE, choice)." });
         }
         if (!isValidTonAddress(userWalletAddress)) {
              return res.status(400).json({ message: "Invalid userWalletAddress format." });
         }
-        const numericBetAmount = parseFloat(betAmountArix);
+        const numericBetAmount = parseFloat(betAmountOXYBLE);
         if (isNaN(numericBetAmount) || numericBetAmount <= 0) {
-            return res.status(400).json({ message: "Invalid ARIX bet amount. Must be greater than 0."});
+            return res.status(400).json({ message: "Invalid OXYBLE bet amount. Must be greater than 0."});
         }
         if (choice !== 'heads' && choice !== 'tails') {
             return res.status(400).json({ message: "Invalid choice. Must be 'heads' or 'tails'." });
@@ -34,7 +34,7 @@ exports.handleCoinflipBet = async (req, res, next) => {
 
         const gameResult = await gameService.playCoinflip({
             userWalletAddress,
-            betAmountArix: numericBetAmount,
+            betAmountOXYBLE: numericBetAmount,
             choice
         });
         
@@ -74,10 +74,10 @@ exports.getCrashHistoryForUser = async (req, res, next) => {
             SELECT
                 cb.id,
                 cb.game_id,
-                cb.bet_amount_arix,
+                cb.bet_amount_OXYBLE,
                 cb.status,
                 cb.cash_out_multiplier,
-                cb.payout_arix,
+                cb.payout_OXYBLE,
                 cb.placed_at,
                 cr.crash_multiplier
             FROM crash_bets cb

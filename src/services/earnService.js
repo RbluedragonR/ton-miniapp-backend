@@ -6,7 +6,7 @@ const tonUtils = require('../utils/tonUtils');
 const userService = require('./userService');
 const { parseStakeParametersFromForwardPayload, parseUnstakeResponsePayload } = require('../utils/payloadParsers');
 const {
-    ARIX_TOKEN_MASTER_ADDRESS,
+    OXYBLE_TOKEN_MASTER_ADDRESS,
     STAKING_CONTRACT_ADDRESS,
     STAKING_CONTRACT_JETTON_WALLET_ADDRESS,
     USDT_JETTON_MASTER_ADDRESS,
@@ -15,7 +15,7 @@ const {
     TON_NETWORK,
 } = require('../config/envConfig');
 const {
-    ARIX_DECIMALS,
+    OXYBLE_DECIMALS,
     USDT_DECIMALS,
     MIN_USDT_WITHDRAWAL_USD_VALUE,
     TON_TRANSACTION_FEES,
@@ -28,7 +28,7 @@ class EarnService {
     async getActiveStakingPlans() {
         const { rows } = await db.query(
             `SELECT plan_id, plan_key, title, duration_days, 
-                    fixed_usdt_apr_percent, arix_early_unstake_penalty_percent, 
+                    fixed_usdt_apr_percent, OXYBLE_early_unstake_penalty_percent, 
                     min_stake_usdt, max_stake_usdt,
                     referral_l1_invest_percent, referral_l2_invest_percent,
                     referral_l2_commission_on_l1_bonus_percent,
@@ -41,7 +41,7 @@ class EarnService {
             title: p.title,
             duration_days: parseInt(p.duration_days),
             fixed_usdt_apr_percent: parseFloat(p.fixed_usdt_apr_percent),
-            arix_early_unstake_penalty_percent: parseFloat(p.arix_early_unstake_penalty_percent),
+            OXYBLE_early_unstake_penalty_percent: parseFloat(p.OXYBLE_early_unstake_penalty_percent),
             min_stake_usdt: parseFloat(p.min_stake_usdt),
             max_stake_usdt: p.max_stake_usdt ? parseFloat(p.max_stake_usdt) : null,
             referral_l1_invest_percent: parseFloat(p.referral_l1_invest_percent || 0),
@@ -63,7 +63,7 @@ class EarnService {
             title: p.title,
             duration_days: parseInt(p.duration_days),
             fixed_usdt_apr_percent: parseFloat(p.fixed_usdt_apr_percent),
-            arix_early_unstake_penalty_percent: parseFloat(p.arix_early_unstake_penalty_percent),
+            OXYBLE_early_unstake_penalty_percent: parseFloat(p.OXYBLE_early_unstake_penalty_percent),
             min_stake_usdt: parseFloat(p.min_stake_usdt),
             max_stake_usdt: p.max_stake_usdt ? parseFloat(p.max_stake_usdt) : null,
             referral_l1_invest_percent: parseFloat(p.referral_l1_invest_percent || 0),
@@ -73,7 +73,7 @@ class EarnService {
         };
     }
 
-    async createStake({ planKey, arixAmount, userWalletAddress, transactionBoc, transactionHash, stakeUUID, referenceUsdtValue, referrerCodeOrAddress }) {
+    async createStake({ planKey, OXYBLEAmount, userWalletAddress, transactionBoc, transactionHash, stakeUUID, referenceUsdtValue, referrerCodeOrAddress }) {
         const plan = await this.getPlanByKey(planKey);
         if (!plan) throw new Error("Invalid or inactive staking plan key.");
 
@@ -83,7 +83,7 @@ class EarnService {
         if (plan.max_stake_usdt && referenceUsdtValue > plan.max_stake_usdt) {
             throw new Error(`Maximum stake for ${plan.title} is $${plan.max_stake_usdt.toFixed(2)} USD.`);
         }
-        if (arixAmount <= 0) throw new Error("ARIX amount must be positive.");
+        if (OXYBLEAmount <= 0) throw new Error("OXYBLE amount must be positive.");
         if (!transactionHash) throw new Error("Transaction hash is required to record the stake.");
         if (!stakeUUID) throw new Error("Valid Stake UUID from frontend is required.");
 
@@ -99,12 +99,12 @@ class EarnService {
 
             const { rows } = await client.query(
                 `INSERT INTO user_stakes (
-                    stake_id, user_wallet_address, staking_plan_id, arix_amount_staked, 
+                    stake_id, user_wallet_address, staking_plan_id, OXYBLE_amount_staked, 
                     reference_usdt_value_at_stake_time, stake_timestamp, unlock_timestamp, 
                     onchain_stake_tx_boc, onchain_stake_tx_hash, status, created_at, updated_at
                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending_confirmation', NOW(), NOW())
                 RETURNING stake_id`,
-                [stakeUUID, userWalletAddress, plan.plan_id, arixAmount, referenceUsdtValue,
+                [stakeUUID, userWalletAddress, plan.plan_id, OXYBLEAmount, referenceUsdtValue,
                     stakeTimestamp, unlockTimestamp, transactionBoc, transactionHash]
             );
             const newStakeId = rows[0].stake_id;
@@ -115,7 +115,7 @@ class EarnService {
 
             await client.query('COMMIT');
 
-            this.verifyOnChainArixStake(newStakeId)
+            this.verifyOnChainOXYBLEStake(newStakeId)
                 .then(verificationResult => {
                     if(verificationResult.verified) console.log(`BG Stake Verify OK for ${newStakeId}`);
                     else console.warn(`BG Stake Verify NOK for ${newStakeId}: ${verificationResult.reason}`);
@@ -245,47 +245,47 @@ class EarnService {
         }
     }
 
-    async prepareArixUnstake(userWalletAddress, stakeId) {
+    async prepareOXYBLEUnstake(userWalletAddress, stakeId) {
         const { rows } = await db.query(
-            `SELECT us.stake_id, us.arix_amount_staked, us.unlock_timestamp, us.status,
-                    sp.arix_early_unstake_penalty_percent
+            `SELECT us.stake_id, us.OXYBLE_amount_staked, us.unlock_timestamp, us.status,
+                    sp.OXYBLE_early_unstake_penalty_percent
              FROM user_stakes us JOIN staking_plans sp ON us.staking_plan_id = sp.plan_id
              WHERE us.stake_id = $1 AND us.user_wallet_address = $2`,
             [stakeId, userWalletAddress]
         );
-        if (!rows[0]) throw new Error("ARIX Stake not found or not owned by user.");
+        if (!rows[0]) throw new Error("OXYBLE Stake not found or not owned by user.");
         const stake = rows[0];
         if (stake.status !== 'active') {
-            throw new Error(`ARIX Stake is not active (Status: ${stake.status}). Cannot initiate unstake.`);
+            throw new Error(`OXYBLE Stake is not active (Status: ${stake.status}). Cannot initiate unstake.`);
         }
 
         const now = new Date();
         const unlockTime = new Date(stake.unlock_timestamp);
-        const principalArix = parseFloat(stake.arix_amount_staked);
+        const principalOXYBLE = parseFloat(stake.OXYBLE_amount_staked);
         let penaltyPercent = 0;
         let messageText = ""; 
         const isEarly = now < unlockTime;
 
         if (isEarly) {
-            penaltyPercent = parseFloat(stake.arix_early_unstake_penalty_percent);
-            messageText = `This is an EARLY unstake of ARIX principal. A ${penaltyPercent}% penalty on staked ARIX will apply. USDT rewards accrued to date will remain claimable.`;
+            penaltyPercent = parseFloat(stake.OXYBLE_early_unstake_penalty_percent);
+            messageText = `This is an EARLY unstake of OXYBLE principal. A ${penaltyPercent}% penalty on staked OXYBLE will apply. USDT rewards accrued to date will remain claimable.`;
         } else {
-            messageText = "Ready for full-term ARIX principal unstake. You will receive your ARIX principal. Accrued USDT rewards are managed separately.";
+            messageText = "Ready for full-term OXYBLE principal unstake. You will receive your OXYBLE principal. Accrued USDT rewards are managed separately.";
         }
         return {
             message: messageText, 
             stakeId: stake.stake_id,
             isEarly,
-            principalArix: principalArix.toFixed(ARIX_DECIMALS),
-            arixPenaltyPercentApplied: penaltyPercent,
+            principalOXYBLE: principalOXYBLE.toFixed(OXYBLE_DECIMALS),
+            OXYBLEPenaltyPercentApplied: penaltyPercent,
         };
     }
 
-    async finalizeArixUnstake({ userWalletAddress, stakeId, unstakeTransactionBoc, unstakeTransactionHash }) {
+    async finalizeOXYBLEUnstake({ userWalletAddress, stakeId, unstakeTransactionBoc, unstakeTransactionHash }) {
         if (!unstakeTransactionHash) {
             throw new Error("Unstake transaction hash is required to finalize and verify the unstake.");
         }
-        console.log(`FINALIZE_ARIX_UNSTAKE (DB Stake ID: ${stakeId}): Hash ${unstakeTransactionHash}.`);
+        console.log(`FINALIZE_OXYBLE_UNSTAKE (DB Stake ID: ${stakeId}): Hash ${unstakeTransactionHash}.`);
 
         const client = await db.getClient();
         try {
@@ -295,16 +295,16 @@ class EarnService {
                  WHERE us.stake_id = $1 AND us.user_wallet_address = $2 FOR UPDATE`,
                 [stakeId, userWalletAddress]
             );
-            if (!stakeRows[0]) throw new Error("ARIX Stake not found for finalization.");
+            if (!stakeRows[0]) throw new Error("OXYBLE Stake not found for finalization.");
             const stake = stakeRows[0];
 
-            if (stake.status !== 'active' && stake.status !== 'pending_arix_unstake_confirmation' && stake.status !== 'unstake_failed') {
-                throw new Error(`ARIX Stake status (${stake.status}) does not allow unstake finalization. Expected 'active', 'pending_arix_unstake_confirmation', or 'unstake_failed' for retry.`);
+            if (stake.status !== 'active' && stake.status !== 'pending_OXYBLE_unstake_confirmation' && stake.status !== 'unstake_failed') {
+                throw new Error(`OXYBLE Stake status (${stake.status}) does not allow unstake finalization. Expected 'active', 'pending_OXYBLE_unstake_confirmation', or 'unstake_failed' for retry.`);
             }
 
             await client.query(
                 `UPDATE user_stakes 
-                 SET status = 'pending_arix_unstake_confirmation', 
+                 SET status = 'pending_OXYBLE_unstake_confirmation', 
                      onchain_unstake_tx_boc = $1, 
                      onchain_unstake_tx_hash = $2, 
                      notes = 'Awaiting on-chain unstake verification.',
@@ -314,33 +314,33 @@ class EarnService {
             );
             await client.query('COMMIT');
 
-            this.verifyOnChainArixUnstakeOutcome(stakeId)
+            this.verifyOnChainOXYBLEUnstakeOutcome(stakeId)
                 .then(res => console.log(`BG Unstake Verify (Stake ${stakeId}): ${res.reason}`))
                 .catch(err => console.error(`BG Unstake Verify Err (Stake ${stakeId}):`, err));
 
             return {
-                message: `ARIX Unstake request submitted. Status: pending_arix_unstake_confirmation. Backend will verify the outcome.`,
+                message: `OXYBLE Unstake request submitted. Status: pending_OXYBLE_unstake_confirmation. Backend will verify the outcome.`,
                 stake_id: stakeId, transactionHash: unstakeTransactionHash
             };
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error("SERVICE: Error in finalizeArixUnstake:", error.message, error.stack);
+            console.error("SERVICE: Error in finalizeOXYBLEUnstake:", error.message, error.stack);
             throw error;
         }
         finally { client.release(); }
     }
 
-    async verifyOnChainArixStake(stakeId) {
+    async verifyOnChainOXYBLEStake(stakeId) {
         console.log(`VERIFY_STAKE (DB Stake ID: ${stakeId}): Starting on-chain verification.`);
         let stakeRecord;
         let planRecord;
-        let userArixJettonWalletAddress;
+        let userOXYBLEJettonWalletAddress;
         let verificationNote = "Verification initiated.";
 
         try {
             const stakeRes = await db.query(
-                `SELECT us.arix_amount_staked, us.user_wallet_address, us.onchain_stake_tx_hash, us.status,
-                        sp.plan_id, sp.duration_days, sp.arix_early_unstake_penalty_percent, sp.plan_key
+                `SELECT us.OXYBLE_amount_staked, us.user_wallet_address, us.onchain_stake_tx_hash, us.status,
+                        sp.plan_id, sp.duration_days, sp.OXYBLE_early_unstake_penalty_percent, sp.plan_key
                  FROM user_stakes us JOIN staking_plans sp ON us.staking_plan_id = sp.plan_id 
                  WHERE us.stake_id = $1`, [stakeId]);
 
@@ -363,9 +363,9 @@ class EarnService {
 
             const tonClient = await tonUtils.getTonClient();
             const userAddr = Address.parse(stakeRecord.user_wallet_address);
-            userArixJettonWalletAddress = await tonUtils.getJettonWalletAddress(userAddr.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'}), ARIX_TOKEN_MASTER_ADDRESS);
-            if (!userArixJettonWalletAddress) {
-                throw new Error(`Could not derive user's ARIX Jetton Wallet for ${userAddr.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'})}. Master: ${ARIX_TOKEN_MASTER_ADDRESS}`);
+            userOXYBLEJettonWalletAddress = await tonUtils.getJettonWalletAddress(userAddr.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'}), OXYBLE_TOKEN_MASTER_ADDRESS);
+            if (!userOXYBLEJettonWalletAddress) {
+                throw new Error(`Could not derive user's OXYBLE Jetton Wallet for ${userAddr.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'})}. Master: ${OXYBLE_TOKEN_MASTER_ADDRESS}`);
             }
 
             console.log(`VERIFY_STAKE: Checking transactions for SC Jetton Wallet: ${STAKING_CONTRACT_JETTON_WALLET_ADDRESS}`);
@@ -373,11 +373,11 @@ class EarnService {
 
             let verified = false;
             verificationNote = "Verification failed: No matching Jetton transfer notification found at SC's Jetton Wallet for this stake's details.";
-            const expectedAmountBn = toNano(stakeRecord.arix_amount_staked.toString());
+            const expectedAmountBn = toNano(stakeRecord.OXYBLE_amount_staked.toString());
 
             for (const tx of scJettonWalletTransactions) {
                 if (tx.inMessage && tx.inMessage.info.type === 'internal' && tx.inMessage.info.src) {
-                    if (tx.inMessage.info.src.equals(Address.parse(userArixJettonWalletAddress))) {
+                    if (tx.inMessage.info.src.equals(Address.parse(userOXYBLEJettonWalletAddress))) {
                         const bodySlice = tx.inMessage.body.beginParse();
                         const opCode = bodySlice.loadUint(32);
 
@@ -419,9 +419,9 @@ class EarnService {
                                 continue;
                             }
                             
-                            const expectedPenaltyBps = parseInt(planRecord.arix_early_unstake_penalty_percent * 100);
-                            if (scPayload.arixLockPenaltyBps !== expectedPenaltyBps) {
-                                verificationNote = `Penalty BPS mismatch. Expected: ${expectedPenaltyBps}, Got: ${scPayload.arixLockPenaltyBps}`;
+                            const expectedPenaltyBps = parseInt(planRecord.OXYBLE_early_unstake_penalty_percent * 100);
+                            if (scPayload.OXYBLELockPenaltyBps !== expectedPenaltyBps) {
+                                verificationNote = `Penalty BPS mismatch. Expected: ${expectedPenaltyBps}, Got: ${scPayload.OXYBLELockPenaltyBps}`;
                                 continue;
                             }
 
@@ -453,24 +453,24 @@ class EarnService {
         }
     }
 
-    async verifyOnChainArixUnstakeOutcome(stakeId) {
+    async verifyOnChainOXYBLEUnstakeOutcome(stakeId) {
         console.log(`VERIFY_UNSTAKE_OUTCOME (DB Stake ID: ${stakeId}): Starting verification.`);
         let stakeRecord;
-        let userArixJettonWalletAddress;
+        let userOXYBLEJettonWalletAddress;
         let verificationNote = "Unstake outcome verification initiated.";
 
         try {
             const stakeRes = await db.query(
-                `SELECT us.user_wallet_address, us.arix_amount_staked, us.unlock_timestamp, 
+                `SELECT us.user_wallet_address, us.OXYBLE_amount_staked, us.unlock_timestamp, 
                         us.onchain_unstake_tx_hash, us.status,
-                        sp.arix_early_unstake_penalty_percent
+                        sp.OXYBLE_early_unstake_penalty_percent
                  FROM user_stakes us JOIN staking_plans sp ON us.staking_plan_id = sp.plan_id
                  WHERE us.stake_id = $1`, [stakeId]
             );
             if (!stakeRes.rows[0]) return { verified: false, reason: "Stake not found in DB for unstake verification." };
             stakeRecord = stakeRes.rows[0];
 
-            if (stakeRecord.status !== 'pending_arix_unstake_confirmation') {
+            if (stakeRecord.status !== 'pending_OXYBLE_unstake_confirmation') {
                 return { verified: true, reason: `Already processed or not in pending state (status: ${stakeRecord.status})` };
             }
             
@@ -478,17 +478,17 @@ class EarnService {
 
             const tonClient = await tonUtils.getTonClient();
             const userAddr = Address.parse(stakeRecord.user_wallet_address);
-            userArixJettonWalletAddress = await tonUtils.getJettonWalletAddress(userAddr.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'}), ARIX_TOKEN_MASTER_ADDRESS);
-            if (!userArixJettonWalletAddress) throw new Error("Could not get user's ARIX Jetton Wallet for unstake verification.");
+            userOXYBLEJettonWalletAddress = await tonUtils.getJettonWalletAddress(userAddr.toString({bounceable: true, testOnly: TON_NETWORK === 'testnet'}), OXYBLE_TOKEN_MASTER_ADDRESS);
+            if (!userOXYBLEJettonWalletAddress) throw new Error("Could not get user's OXYBLE Jetton Wallet for unstake verification.");
 
-            console.log(`VERIFY_UNSTAKE: Checking transactions for User's Jetton Wallet: ${userArixJettonWalletAddress}`);
-            const userJettonWalletTransactions = await tonClient.getTransactions(Address.parse(userArixJettonWalletAddress), { limit: 25, archival: true });
+            console.log(`VERIFY_UNSTAKE: Checking transactions for User's Jetton Wallet: ${userOXYBLEJettonWalletAddress}`);
+            const userJettonWalletTransactions = await tonClient.getTransactions(Address.parse(userOXYBLEJettonWalletAddress), { limit: 25, archival: true });
 
             let verifiedReturn = false;
-            verificationNote = "No ARIX return transfer found to user's Jetton Wallet from SC Jetton Wallet matching this unstake.";
-            let finalArixReturnedByScToUser = BigInt(0);
+            verificationNote = "No OXYBLE return transfer found to user's Jetton Wallet from SC Jetton Wallet matching this unstake.";
+            let finalOXYBLEReturnedByScToUser = BigInt(0);
             let scReportedPenalty = BigInt(0);
-            let scReportedArixLockReward = BigInt(0);
+            let scReportedOXYBLELockReward = BigInt(0);
 
             for (const tx of userJettonWalletTransactions) {
                 if (tx.inMessage && tx.inMessage.info.type === 'internal' && tx.inMessage.info.src) {
@@ -498,7 +498,7 @@ class EarnService {
 
                         if (opCode === OP_JETTON_TRANSFER_NOTIFICATION || opCode === OP_JETTON_INTERNAL_TRANSFER) {
                             const queryId = bodySlice.loadUintBig(64);
-                            finalArixReturnedByScToUser = bodySlice.loadCoins();
+                            finalOXYBLEReturnedByScToUser = bodySlice.loadCoins();
                             const originalSenderOfNotification = bodySlice.loadAddressSlices(); 
 
                             let forwardPayloadCell = null;
@@ -516,17 +516,17 @@ class EarnService {
                                 if (unstakeResp) {
                                     const dbStakeIdAsScId = BigInt('0x' + stakeId.replace(/-/g, '').substring(0, 16));
                                     if (unstakeResp.stakeIdentifierProcessed === dbStakeIdAsScId && unstakeResp.stakerAddress.equals(userAddr)) {
-                                        scReportedPenalty = unstakeResp.arixPenaltyApplied;
-                                        scReportedArixLockReward = unstakeResp.arixLockRewardPaid;
+                                        scReportedPenalty = unstakeResp.OXYBLEPenaltyApplied;
+                                        scReportedOXYBLELockReward = unstakeResp.OXYBLELockRewardPaid;
 
-                                        if (finalArixReturnedByScToUser !== unstakeResp.finalArixAmountReturned) {
-                                            console.warn(`VERIFY_UNSTAKE: Amount mismatch in SC payload for stake ${stakeId}. Transfered: ${fromNano(finalArixReturnedByScToUser)}, Payload reports: ${fromNano(unstakeResp.finalArixAmountReturned)}`);
+                                        if (finalOXYBLEReturnedByScToUser !== unstakeResp.finalOXYBLEAmountReturned) {
+                                            console.warn(`VERIFY_UNSTAKE: Amount mismatch in SC payload for stake ${stakeId}. Transfered: ${fromNano(finalOXYBLEReturnedByScToUser)}, Payload reports: ${fromNano(unstakeResp.finalOXYBLEAmountReturned)}`);
                                         }
-                                        verificationNote = `ARIX return verified. SC Payload: Penalty=${fromNano(scReportedPenalty)}, SC ARIX Reward=${fromNano(scReportedArixLockReward)}. Actual ARIX to JW: ${fromNano(finalArixReturnedByScToUser)}`;
+                                        verificationNote = `OXYBLE return verified. SC Payload: Penalty=${fromNano(scReportedPenalty)}, SC OXYBLE Reward=${fromNano(scReportedOXYBLELockReward)}. Actual OXYBLE to JW: ${fromNano(finalOXYBLEReturnedByScToUser)}`;
                                         verifiedReturn = true; break;
                                     }
-                                } else { verificationNote = "Returned ARIX, but SC unstake response payload parse failed."; }
-                            } else { verificationNote = "Returned ARIX, but no SC unstake response payload in notification."; }
+                                } else { verificationNote = "Returned OXYBLE, but SC unstake response payload parse failed."; }
+                            } else { verificationNote = "Returned OXYBLE, but no SC unstake response payload in notification."; }
                             if(verifiedReturn) break;
                         }
                     }
@@ -539,16 +539,16 @@ class EarnService {
             let finalDbStatus = 'unstake_failed'; 
 
             if (verifiedReturn) {
-                finalDbStatus = isActuallyEarly ? 'early_arix_unstaked' : 'completed_arix_unstaked';
+                finalDbStatus = isActuallyEarly ? 'early_OXYBLE_unstaked' : 'completed_OXYBLE_unstaked';
             }
 
             const finalPenaltyToStore = parseFloat(fromNano(scReportedPenalty));
-            const finalArixRewardFromLockToStore = parseFloat(fromNano(scReportedArixLockReward));
+            const finalOXYBLERewardFromLockToStore = parseFloat(fromNano(scReportedOXYBLELockReward));
 
             await db.query(
-                `UPDATE user_stakes SET status = $1, arix_penalty_applied = $2, arix_final_reward_calculated = $3, notes = $4, updated_at = NOW() 
+                `UPDATE user_stakes SET status = $1, OXYBLE_penalty_applied = $2, OXYBLE_final_reward_calculated = $3, notes = $4, updated_at = NOW() 
                  WHERE stake_id = $5`,
-                [finalDbStatus, finalPenaltyToStore, finalArixRewardFromLockToStore, verificationNote.substring(0,250), stakeId]
+                [finalDbStatus, finalPenaltyToStore, finalOXYBLERewardFromLockToStore, verificationNote.substring(0,250), stakeId]
             );
             if(verifiedReturn) {
                 console.log(`VERIFY_UNSTAKE (Stake ID: ${stakeId}): Successfully verified. Status: ${finalDbStatus}. Note: ${verificationNote}`);
@@ -569,18 +569,18 @@ class EarnService {
 
     async findAllStakesAndRewardsByUser(userWalletAddress, currentArxPrice) {
         const userResult = await db.query(
-            "SELECT claimable_usdt_balance, claimable_arix_rewards FROM users WHERE wallet_address = $1",
+            "SELECT claimable_usdt_balance, claimable_OXYBLE_rewards FROM users WHERE wallet_address = $1",
             [userWalletAddress]
         );
-        const userData = userResult.rows[0] || { claimable_usdt_balance: 0, claimable_arix_rewards: 0 };
+        const userData = userResult.rows[0] || { claimable_usdt_balance: 0, claimable_OXYBLE_rewards: 0 };
         const totalClaimableUsdt = parseFloat(userData.claimable_usdt_balance);
-        const totalClaimableArix = parseFloat(userData.claimable_arix_rewards);
+        const totalClaimableOXYBLE = parseFloat(userData.claimable_OXYBLE_rewards);
 
         const stakesQuery = `
             SELECT us.*, 
                    sp.plan_key, sp.title AS plan_title, 
                    sp.fixed_usdt_apr_percent, 
-                   sp.arix_early_unstake_penalty_percent, 
+                   sp.OXYBLE_early_unstake_penalty_percent, 
                    sp.duration_days AS plan_duration_days,
                    (EXTRACT(EPOCH FROM (CASE WHEN us.unlock_timestamp > NOW() THEN us.unlock_timestamp - NOW() ELSE INTERVAL '0 seconds' END)) / (24 * 60 * 60))::INTEGER AS remaining_days
             FROM user_stakes us
@@ -590,33 +590,33 @@ class EarnService {
         const { rows: stakesFromDb } = await db.query(stakesQuery, [userWalletAddress]);
 
         const stakes = stakesFromDb.map(s => {
-            const arixAmountStakedNum = parseFloat(s.arix_amount_staked);
+            const OXYBLEAmountStakedNum = parseFloat(s.OXYBLE_amount_staked);
             return {
                 id: s.stake_id,
                 planKey: s.plan_key,
                 planTitle: s.plan_title,
-                arixAmountStaked: arixAmountStakedNum.toFixed(ARIX_DECIMALS),
-                currentUsdtValueOfStakedArix: currentArxPrice && arixAmountStakedNum > 0 ? (arixAmountStakedNum * currentArxPrice).toFixed(2) : 'N/A',
+                OXYBLEAmountStaked: OXYBLEAmountStakedNum.toFixed(OXYBLE_DECIMALS),
+                currentUsdtValueOfStakedOXYBLE: currentArxPrice && OXYBLEAmountStakedNum > 0 ? (OXYBLEAmountStakedNum * currentArxPrice).toFixed(2) : 'N/A',
                 referenceUsdtValueAtStakeTime: parseFloat(s.reference_usdt_value_at_stake_time).toFixed(2),
                 fixedUsdtAprPercent: parseFloat(s.fixed_usdt_apr_percent).toFixed(2),
                 usdtRewardAccruedTotal: parseFloat(s.usdt_reward_accrued_total || 0).toFixed(USDT_DECIMALS),
-                arixEarlyUnstakePenaltyPercent: parseFloat(s.arix_early_unstake_penalty_percent).toFixed(2),
-                remainingDays: (s.status === 'active' || s.status === 'pending_confirmation' || s.status === 'pending_arix_unstake_confirmation') ? (Math.max(0, s.remaining_days || 0)) : 0,
+                OXYBLEEarlyUnstakePenaltyPercent: parseFloat(s.OXYBLE_early_unstake_penalty_percent).toFixed(2),
+                remainingDays: (s.status === 'active' || s.status === 'pending_confirmation' || s.status === 'pending_OXYBLE_unstake_confirmation') ? (Math.max(0, s.remaining_days || 0)) : 0,
                 status: s.status,
                 stakeTimestamp: new Date(s.stake_timestamp).toISOString(),
                 unlockTimestamp: new Date(s.unlock_timestamp).toISOString(),
                 onchainStakeTxHash: s.onchain_stake_tx_hash,
                 onchainUnstakeTxHash: s.onchain_unstake_tx_hash,
                 planDurationDays: parseInt(s.plan_duration_days, 10),
-                arixPenaltyApplied: s.arix_penalty_applied ? parseFloat(s.arix_penalty_applied).toFixed(ARIX_DECIMALS) : '0.000000000',
-                arixFinalRewardCalculated: s.arix_final_reward_calculated ? parseFloat(s.arix_final_reward_calculated).toFixed(ARIX_DECIMALS) : '0.000000000',
+                OXYBLEPenaltyApplied: s.OXYBLE_penalty_applied ? parseFloat(s.OXYBLE_penalty_applied).toFixed(OXYBLE_DECIMALS) : '0.000000000',
+                OXYBLEFinalRewardCalculated: s.OXYBLE_final_reward_calculated ? parseFloat(s.OXYBLE_final_reward_calculated).toFixed(OXYBLE_DECIMALS) : '0.000000000',
             };
         });
 
         return {
             stakes,
             totalClaimableUsdt: totalClaimableUsdt.toFixed(USDT_DECIMALS),
-            totalClaimableArix: totalClaimableArix.toFixed(ARIX_DECIMALS)
+            totalClaimableOXYBLE: totalClaimableOXYBLE.toFixed(OXYBLE_DECIMALS)
         };
     }
 
@@ -752,48 +752,48 @@ class EarnService {
         }
     }
 
-    async processArixRewardWithdrawalRequest(userWalletAddress, amountArixToWithdraw) {
+    async processOXYBLERewardWithdrawalRequest(userWalletAddress, amountOXYBLEToWithdraw) {
         const currentArxPrice = await priceService.getArxUsdtPrice();
-        let minArixWithdrawalAmount = 0;
+        let minOXYBLEWithdrawalAmount = 0;
         if (currentArxPrice && currentArxPrice > 0) {
-            minArixWithdrawalAmount = MIN_USDT_WITHDRAWAL_USD_VALUE / currentArxPrice;
+            minOXYBLEWithdrawalAmount = MIN_USDT_WITHDRAWAL_USD_VALUE / currentArxPrice;
         } else {
-            minArixWithdrawalAmount = 10; 
-            console.warn(`ARIX price not available for withdrawal check. Using fallback min: ${minArixWithdrawalAmount} ARIX.`);
+            minOXYBLEWithdrawalAmount = 10; 
+            console.warn(`OXYBLE price not available for withdrawal check. Using fallback min: ${minOXYBLEWithdrawalAmount} OXYBLE.`);
         }
 
-        if (amountArixToWithdraw < minArixWithdrawalAmount && minArixWithdrawalAmount > 0) {
-            throw new Error(`Minimum ARIX withdrawal is approx. ${minArixWithdrawalAmount.toFixed(ARIX_DECIMALS)} ARIX.`);
+        if (amountOXYBLEToWithdraw < minOXYBLEWithdrawalAmount && minOXYBLEWithdrawalAmount > 0) {
+            throw new Error(`Minimum OXYBLE withdrawal is approx. ${minOXYBLEWithdrawalAmount.toFixed(OXYBLE_DECIMALS)} OXYBLE.`);
         }
 
-        const amountArixSmallestUnits = toNano(amountArixToWithdraw.toFixed(ARIX_DECIMALS));
+        const amountOXYBLESmallestUnits = toNano(amountOXYBLEToWithdraw.toFixed(OXYBLE_DECIMALS));
 
         const client = await db.getClient();
         try {
             await client.query('BEGIN');
-            const userResult = await client.query("SELECT claimable_arix_rewards FROM users WHERE wallet_address = $1 FOR UPDATE", [userWalletAddress]);
-            const currentClaimableArix = userResult.rows[0] ? parseFloat(userResult.rows[0].claimable_arix_rewards) : 0;
+            const userResult = await client.query("SELECT claimable_OXYBLE_rewards FROM users WHERE wallet_address = $1 FOR UPDATE", [userWalletAddress]);
+            const currentClaimableOXYBLE = userResult.rows[0] ? parseFloat(userResult.rows[0].claimable_OXYBLE_rewards) : 0;
 
-            if (currentClaimableArix < amountArixToWithdraw) {
+            if (currentClaimableOXYBLE < amountOXYBLEToWithdraw) {
                 await client.query('ROLLBACK');
-                throw new Error(`Insufficient claimable ARIX rewards. Available: ${currentClaimableArix.toFixed(ARIX_DECIMALS)} ARIX`);
+                throw new Error(`Insufficient claimable OXYBLE rewards. Available: ${currentClaimableOXYBLE.toFixed(OXYBLE_DECIMALS)} OXYBLE`);
             }
 
-            const newBalance = currentClaimableArix - amountArixToWithdraw;
-            await client.query("UPDATE users SET claimable_arix_rewards = $1, updated_at = NOW() WHERE wallet_address = $2", [newBalance, userWalletAddress]);
+            const newBalance = currentClaimableOXYBLE - amountOXYBLEToWithdraw;
+            await client.query("UPDATE users SET claimable_OXYBLE_rewards = $1, updated_at = NOW() WHERE wallet_address = $2", [newBalance, userWalletAddress]);
 
             
             
             
-            console.log(`ARIX Reward Withdrawal recorded for ${userWalletAddress}: ${amountArixToWithdraw} ARIX. Balance updated. Payout is manual or via separate process for now.`);
+            console.log(`OXYBLE Reward Withdrawal recorded for ${userWalletAddress}: ${amountOXYBLEToWithdraw} OXYBLE. Balance updated. Payout is manual or via separate process for now.`);
 
             await client.query('COMMIT');
-            return { message: `ARIX Reward Withdrawal request for ${amountArixToWithdraw.toFixed(ARIX_DECIMALS)} ARIX recorded. Payouts are processed periodically.`, withdrawalId: `ARIX-MANUAL-${Date.now()}` };
+            return { message: `OXYBLE Reward Withdrawal request for ${amountOXYBLEToWithdraw.toFixed(OXYBLE_DECIMALS)} OXYBLE recorded. Payouts are processed periodically.`, withdrawalId: `OXYBLE-MANUAL-${Date.now()}` };
         } catch (error) {
             if (client && client.activeQuery === null) {
-                try { await client.query('ROLLBACK'); } catch (rbError) { console.error("Rollback error in outer catch (ARIX withdrawal):", rbError); }
+                try { await client.query('ROLLBACK'); } catch (rbError) { console.error("Rollback error in outer catch (OXYBLE withdrawal):", rbError); }
             }
-            console.error("SERVICE: Error in processArixRewardWithdrawalRequest:", error.message, error.stack);
+            console.error("SERVICE: Error in processOXYBLERewardWithdrawalRequest:", error.message, error.stack);
             throw error;
         } finally {
             if (client) client.release();

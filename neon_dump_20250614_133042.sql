@@ -47,9 +47,9 @@ ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_telegram
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_referral_code_key;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_usdt_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_pkey1;
-ALTER TABLE IF EXISTS ONLY public.user_arix_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_pkey;
+ALTER TABLE IF EXISTS ONLY public.user_OXYBLE_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_usdt_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_onchain_tx_hash_key1;
-ALTER TABLE IF EXISTS ONLY public.user_arix_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_onchain_tx_hash_key;
+ALTER TABLE IF EXISTS ONLY public.user_OXYBLE_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_onchain_tx_hash_key;
 ALTER TABLE IF EXISTS ONLY public.user_task_completions DROP CONSTRAINT IF EXISTS user_task_completions_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_stakes DROP CONSTRAINT IF EXISTS user_stakes_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_stakes DROP CONSTRAINT IF EXISTS user_stakes_onchain_unstake_tx_hash_key;
@@ -65,7 +65,7 @@ ALTER TABLE IF EXISTS ONLY public.announcements DROP CONSTRAINT IF EXISTS announ
 ALTER TABLE IF EXISTS ONLY neon_auth.users_sync DROP CONSTRAINT IF EXISTS users_sync_pkey;
 ALTER TABLE IF EXISTS public.user_usdt_withdrawals ALTER COLUMN withdrawal_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.user_task_completions ALTER COLUMN completion_id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.user_arix_withdrawals ALTER COLUMN withdrawal_id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.user_OXYBLE_withdrawals ALTER COLUMN withdrawal_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.tasks ALTER COLUMN task_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.staking_plans ALTER COLUMN plan_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.referral_rewards ALTER COLUMN reward_id DROP DEFAULT;
@@ -79,7 +79,7 @@ DROP TABLE IF EXISTS public.user_usdt_withdrawals;
 DROP SEQUENCE IF EXISTS public.user_task_completions_completion_id_seq;
 DROP TABLE IF EXISTS public.user_task_completions;
 DROP TABLE IF EXISTS public.user_stakes;
-DROP TABLE IF EXISTS public.user_arix_withdrawals;
+DROP TABLE IF EXISTS public.user_OXYBLE_withdrawals;
 DROP SEQUENCE IF EXISTS public.tasks_task_id_seq;
 DROP TABLE IF EXISTS public.tasks;
 DROP SEQUENCE IF EXISTS public.staking_plans_plan_id_seq;
@@ -214,11 +214,11 @@ ALTER SEQUENCE public.announcements_announcement_id_seq OWNED BY public.announce
 CREATE TABLE public.coinflip_history (
     game_id integer NOT NULL,
     user_wallet_address character varying(68) NOT NULL,
-    bet_amount_arix numeric(20,9) NOT NULL,
+    bet_amount_OXYBLE numeric(20,9) NOT NULL,
     choice character varying(10) NOT NULL,
     server_coin_side character varying(10) NOT NULL,
     outcome character varying(10) NOT NULL,
-    amount_delta_arix numeric(20,9) NOT NULL,
+    amount_delta_OXYBLE numeric(20,9) NOT NULL,
     played_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -337,7 +337,7 @@ CREATE TABLE public.staking_plans (
     title character varying(100) NOT NULL,
     duration_days integer NOT NULL,
     fixed_usdt_apr_percent numeric(5,2) NOT NULL,
-    arix_early_unstake_penalty_percent numeric(5,2) NOT NULL,
+    OXYBLE_early_unstake_penalty_percent numeric(5,2) NOT NULL,
     min_stake_usdt numeric(10,2) DEFAULT 0,
     max_stake_usdt numeric(10,2),
     referral_l1_invest_percent numeric(5,2) DEFAULT 0,
@@ -381,7 +381,7 @@ CREATE TABLE public.tasks (
     task_key character varying(50) NOT NULL,
     title character varying(255) NOT NULL,
     description text,
-    reward_arix_amount numeric(20,9) DEFAULT 0,
+    reward_OXYBLE_amount numeric(20,9) DEFAULT 0,
     task_type character varying(50) DEFAULT 'social'::character varying,
     validation_type character varying(50) DEFAULT 'manual'::character varying,
     action_url text,
@@ -419,13 +419,13 @@ ALTER SEQUENCE public.tasks_task_id_seq OWNED BY public.tasks.task_id;
 
 --
 -- TOC entry 220 (class 1259 OID 98388)
--- Name: user_arix_withdrawals; Type: TABLE; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.user_arix_withdrawals (
+CREATE TABLE public.user_OXYBLE_withdrawals (
     withdrawal_id integer NOT NULL,
     user_wallet_address character varying(68) NOT NULL,
-    amount_arix numeric(20,9) NOT NULL,
+    amount_OXYBLE numeric(20,9) NOT NULL,
     status character varying(20) DEFAULT 'pending_payout'::character varying NOT NULL,
     onchain_tx_hash character varying(64),
     requested_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
@@ -442,7 +442,7 @@ CREATE TABLE public.user_stakes (
     stake_id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_wallet_address character varying(68) NOT NULL,
     staking_plan_id integer NOT NULL,
-    arix_amount_staked numeric(20,9) NOT NULL,
+    OXYBLE_amount_staked numeric(20,9) NOT NULL,
     reference_usdt_value_at_stake_time numeric(20,6) NOT NULL,
     stake_timestamp timestamp with time zone NOT NULL,
     unlock_timestamp timestamp with time zone NOT NULL,
@@ -451,8 +451,8 @@ CREATE TABLE public.user_stakes (
     status character varying(30) DEFAULT 'pending_confirmation'::character varying NOT NULL,
     usdt_reward_accrued_total numeric(20,6) DEFAULT 0.00,
     last_usdt_reward_calc_timestamp timestamp with time zone,
-    arix_penalty_applied numeric(20,9) DEFAULT 0,
-    arix_final_reward_calculated numeric(20,9) DEFAULT 0,
+    OXYBLE_penalty_applied numeric(20,9) DEFAULT 0,
+    OXYBLE_final_reward_calculated numeric(20,9) DEFAULT 0,
     onchain_unstake_tx_boc text,
     onchain_unstake_tx_hash character varying(64),
     notes text,
@@ -539,7 +539,7 @@ CREATE SEQUENCE public.user_usdt_withdrawals_withdrawal_id_seq
 -- Name: user_usdt_withdrawals_withdrawal_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.user_usdt_withdrawals_withdrawal_id_seq OWNED BY public.user_arix_withdrawals.withdrawal_id;
+ALTER SEQUENCE public.user_usdt_withdrawals_withdrawal_id_seq OWNED BY public.user_OXYBLE_withdrawals.withdrawal_id;
 
 
 --
@@ -579,7 +579,7 @@ CREATE TABLE public.users (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     claimable_usdt_balance numeric(20,6) DEFAULT 0.00 NOT NULL,
-    claimable_arix_rewards numeric(20,9) DEFAULT 0.00 NOT NULL
+    claimable_OXYBLE_rewards numeric(20,9) DEFAULT 0.00 NOT NULL
 );
 
 
@@ -633,10 +633,10 @@ ALTER TABLE ONLY public.tasks ALTER COLUMN task_id SET DEFAULT nextval('public.t
 
 --
 -- TOC entry 3246 (class 2604 OID 98391)
--- Name: user_arix_withdrawals withdrawal_id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals withdrawal_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_arix_withdrawals ALTER COLUMN withdrawal_id SET DEFAULT nextval('public.user_usdt_withdrawals_withdrawal_id_seq'::regclass);
+ALTER TABLE ONLY public.user_OXYBLE_withdrawals ALTER COLUMN withdrawal_id SET DEFAULT nextval('public.user_usdt_withdrawals_withdrawal_id_seq'::regclass);
 
 
 --
@@ -681,7 +681,7 @@ COPY public.announcements (announcement_id, title, content, type, image_url, act
 -- Data for Name: coinflip_history; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.coinflip_history (game_id, user_wallet_address, bet_amount_arix, choice, server_coin_side, outcome, amount_delta_arix, played_at) FROM stdin;
+COPY public.coinflip_history (game_id, user_wallet_address, bet_amount_OXYBLE, choice, server_coin_side, outcome, amount_delta_OXYBLE, played_at) FROM stdin;
 \.
 
 
@@ -721,7 +721,7 @@ COPY public.referral_rewards (reward_id, stake_id, referrer_wallet_address, refe
 -- Data for Name: staking_plans; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.staking_plans (plan_id, plan_key, title, duration_days, fixed_usdt_apr_percent, arix_early_unstake_penalty_percent, min_stake_usdt, max_stake_usdt, referral_l1_invest_percent, referral_l2_invest_percent, referral_l2_commission_on_l1_bonus_percent, is_active, created_at) FROM stdin;
+COPY public.staking_plans (plan_id, plan_key, title, duration_days, fixed_usdt_apr_percent, OXYBLE_early_unstake_penalty_percent, min_stake_usdt, max_stake_usdt, referral_l1_invest_percent, referral_l2_invest_percent, referral_l2_commission_on_l1_bonus_percent, is_active, created_at) FROM stdin;
 1	STARTER	Starter Plan	30	6.00	7.00	100.00	500.00	5.00	1.00	0.00	t	2025-06-03 22:14:19.786755+00
 2	BUILDER	Builder Plan	60	7.50	7.00	500.00	1000.00	7.00	2.00	0.00	t	2025-06-03 22:14:19.786755+00
 3	ADVANCED	Advanced Plan	90	9.00	7.00	1000.00	5000.00	10.00	0.00	3.00	t	2025-06-03 22:14:19.786755+00
@@ -735,20 +735,20 @@ COPY public.staking_plans (plan_id, plan_key, title, duration_days, fixed_usdt_a
 -- Data for Name: tasks; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.tasks (task_id, task_key, title, description, reward_arix_amount, task_type, validation_type, action_url, is_active, is_repeatable, max_completions_user, start_date, end_date, created_at) FROM stdin;
-1	TWITTER_FOLLOW_ARIX	Follow ARIX on Twitter	Follow our official ARIX Twitter account and verify.	100.000000000	social	manual	https://twitter.com/ARIX_PROJECT_X	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
-2	TELEGRAM_JOIN_ARIX	Join ARIX Telegram Channel	Join our main Telegram channel for updates.	50.000000000	social	manual	https://t.me/ARIX_CHANEL	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
-3	FIRST_STAKE_BONUS	First Stake Bonus	Make your first ARIX stake on any plan and get a bonus!	200.000000000	engagement	auto_approve_on_stake	\N	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
+COPY public.tasks (task_id, task_key, title, description, reward_OXYBLE_amount, task_type, validation_type, action_url, is_active, is_repeatable, max_completions_user, start_date, end_date, created_at) FROM stdin;
+1	TWITTER_FOLLOW_OXYBLE	Follow OXYBLE on Twitter	Follow our official OXYBLE Twitter account and verify.	100.000000000	social	manual	https://twitter.com/OXYBLE_PROJECT_X	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
+2	TELEGRAM_JOIN_OXYBLE	Join OXYBLE Telegram Channel	Join our main Telegram channel for updates.	50.000000000	social	manual	https://t.me/OXYBLE_CHANEL	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
+3	FIRST_STAKE_BONUS	First Stake Bonus	Make your first OXYBLE stake on any plan and get a bonus!	200.000000000	engagement	auto_approve_on_stake	\N	t	f	1	\N	\N	2025-06-03 22:14:20.089542+00
 \.
 
 
 --
 -- TOC entry 3506 (class 0 OID 98388)
 -- Dependencies: 220
--- Data for Name: user_arix_withdrawals; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: user_OXYBLE_withdrawals; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.user_arix_withdrawals (withdrawal_id, user_wallet_address, amount_arix, status, onchain_tx_hash, requested_at, processed_at) FROM stdin;
+COPY public.user_OXYBLE_withdrawals (withdrawal_id, user_wallet_address, amount_OXYBLE, status, onchain_tx_hash, requested_at, processed_at) FROM stdin;
 \.
 
 
@@ -758,7 +758,7 @@ COPY public.user_arix_withdrawals (withdrawal_id, user_wallet_address, amount_ar
 -- Data for Name: user_stakes; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.user_stakes (stake_id, user_wallet_address, staking_plan_id, arix_amount_staked, reference_usdt_value_at_stake_time, stake_timestamp, unlock_timestamp, onchain_stake_tx_boc, onchain_stake_tx_hash, status, usdt_reward_accrued_total, last_usdt_reward_calc_timestamp, arix_penalty_applied, arix_final_reward_calculated, onchain_unstake_tx_boc, onchain_unstake_tx_hash, notes, created_at, updated_at) FROM stdin;
+COPY public.user_stakes (stake_id, user_wallet_address, staking_plan_id, OXYBLE_amount_staked, reference_usdt_value_at_stake_time, stake_timestamp, unlock_timestamp, onchain_stake_tx_boc, onchain_stake_tx_hash, status, usdt_reward_accrued_total, last_usdt_reward_calc_timestamp, OXYBLE_penalty_applied, OXYBLE_final_reward_calculated, onchain_unstake_tx_boc, onchain_unstake_tx_hash, notes, created_at, updated_at) FROM stdin;
 \.
 
 
@@ -791,7 +791,7 @@ COPY public.user_usdt_withdrawals (withdrawal_id, user_wallet_address, amount_us
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.users (wallet_address, telegram_id, username, referral_code, referrer_wallet_address, created_at, updated_at, claimable_usdt_balance, claimable_arix_rewards) FROM stdin;
+COPY public.users (wallet_address, telegram_id, username, referral_code, referrer_wallet_address, created_at, updated_at, claimable_usdt_balance, claimable_OXYBLE_rewards) FROM stdin;
 0:43083987ff40670469d1483c27f99f31bd307d6ebebfdeab5b32e7b98d180d2d	\N	\N	PF7EIWXV	\N	2025-06-04 11:55:12.260376+00	2025-06-04 11:55:12.260376+00	0.000000	0.000000000
 0:d42060eeef8d8163c37d4d96a56dd3d6a9448ee71c0b87329f536c5a9c5ca321	691258888	babubig	CS6JJGPS	\N	2025-06-04 01:47:02.276714+00	2025-06-04 14:01:17.878099+00	0.000000	0.000000000
 0:67c517996903dce7917688ffdf9c3ba1702d5c90987cb94ed01908de554180e3	\N	\N	BHDANQHH	\N	2025-06-05 00:50:57.575671+00	2025-06-05 00:50:57.575671+00	0.000000	0.000000000
@@ -1002,10 +1002,10 @@ ALTER TABLE ONLY public.user_task_completions
 
 --
 -- TOC entry 3301 (class 2606 OID 98397)
--- Name: user_arix_withdrawals user_usdt_withdrawals_onchain_tx_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals user_usdt_withdrawals_onchain_tx_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_arix_withdrawals
+ALTER TABLE ONLY public.user_OXYBLE_withdrawals
     ADD CONSTRAINT user_usdt_withdrawals_onchain_tx_hash_key UNIQUE (onchain_tx_hash);
 
 
@@ -1020,10 +1020,10 @@ ALTER TABLE ONLY public.user_usdt_withdrawals
 
 --
 -- TOC entry 3303 (class 2606 OID 98395)
--- Name: user_arix_withdrawals user_usdt_withdrawals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals user_usdt_withdrawals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_arix_withdrawals
+ALTER TABLE ONLY public.user_OXYBLE_withdrawals
     ADD CONSTRAINT user_usdt_withdrawals_pkey PRIMARY KEY (withdrawal_id);
 
 
@@ -1140,7 +1140,7 @@ CREATE INDEX idx_user_task_completions_user_task ON public.user_task_completions
 -- Name: idx_user_usdt_withdrawals_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_user_usdt_withdrawals_status ON public.user_arix_withdrawals USING btree (status);
+CREATE INDEX idx_user_usdt_withdrawals_status ON public.user_OXYBLE_withdrawals USING btree (status);
 
 
 --
@@ -1148,7 +1148,7 @@ CREATE INDEX idx_user_usdt_withdrawals_status ON public.user_arix_withdrawals US
 -- Name: idx_user_usdt_withdrawals_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_user_usdt_withdrawals_user ON public.user_arix_withdrawals USING btree (user_wallet_address);
+CREATE INDEX idx_user_usdt_withdrawals_user ON public.user_OXYBLE_withdrawals USING btree (user_wallet_address);
 
 
 --

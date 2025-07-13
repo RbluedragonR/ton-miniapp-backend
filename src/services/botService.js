@@ -1,30 +1,42 @@
-const TelegramBot = require('node-telegram-bot-api');
-require('../config/envConfig');
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
+const { Telegraf, Markup } = require("telegraf");
 
-if (!token) {
-  throw new Error('TELEGRAM_BOT_TOKEN is not set in environment variables!');
-}
+// ⚠️ Use your regenerated token from BotFather here
+const bot = new Telegraf("7716949534:AAHIB12sYKULosOx7xEa0dwH984sBWHwhik");
 
-// Initialize the bot
-const bot = new TelegramBot(token);
-console.log('Telegram bot service initialized.');
-
-// Simple /start command handler
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, 'Welcome to ARIX Terminal!');
+bot.start((ctx) => {
+  ctx.reply(
+    `Hello! Welcome to Oxyble Game!
+You are now the member of an oxygen miners.
+Pay only $10/year to plant your RWA tree and start mining with our community.
+Invite your friend and get $2.5 as your reward and even more.
+Connect powered NFTs and pump up your passive income.
+Oxyble team will definitely appreciate your efforts once the token is listed (the dates are coming soon).
+Think about your friends — bring them to the game and get even more rewards together!`,
+    Markup.inlineKeyboard([
+      [Markup.button.webApp("Play (Pay with Stars)", "https://oxyble.vercel.app")],
+      [Markup.button.url("Subscribe (link to telegram channel)", "https://t.me/oxyble")],
+      [Markup.button.callback("How to play (Open the rules)", "earn_info")],
+      [Markup.button.callback("Sign up (Nick, channel subscription, welcome bonus 1000 coins)", "sign_up")],
+    ])
+  );
 });
 
-// Set the webhook and export the bot instance
-const webhookUrl = `${process.env.RAILWAY_STATIC_URL}/telegram-webhook-${token}`;
-bot.setWebHook(webhookUrl)
-  .then(() => {
-    console.log(`Telegram bot webhook successfully set up at ${webhookUrl}`);
-  })
-  .catch((err) => {
-    console.error('Error setting up Telegram webhook:', err);
-  });
+// ✅ Properly handle callback buttons
+bot.action("earn_info", (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply("📜 You earn coins by tapping and completing daily missions. Invite others to earn even more!");
+});
 
+bot.action("sign_up", (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply("📝 Please enter your nickname to register and get 1000 free coins as a welcome bonus!");
+});
+
+bot.launch();
+console.log("✅ Bot is running...");
+
+// Export the bot instance for use in the server
 module.exports = { bot };

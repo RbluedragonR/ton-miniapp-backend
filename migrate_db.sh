@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}--- ARIX Terminal Backend Deployment Script ---${NC}"
+echo -e "${BLUE}--- OXYBLE Terminal Backend Deployment Script ---${NC}"
 echo ""
 
 # --- PART 1: DEPLOY LATEST BACKEND CODE ---
@@ -47,7 +47,7 @@ cat > "$ENV_SCRIPT_FILE" << EOF
 # --- Export variables for the 'railway up' command ---
 export DATABASE_URL='${RAILWAY_DB_URL}'
 export POSTGRES_URL='${RAILWAY_DB_URL}'
-export ARIX_TOKEN_MASTER_ADDRESS='EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd'
+export OXYBLE_TOKEN_MASTER_ADDRESS='EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd'
 export BACKEND_USDT_WALLET_ADDRESS='UQC7X42jH4O87Jpeo7kseX5HEXwEXKEm2S-FifEsjV2hgGpQ'
 export BACKEND_USDT_WALLET_MNEMONIC='soldier wife alpha airport between train enhance bench citizen rubber arrange gospel bright chase gesture lecture river affair denial coast ill miracle jacket genre'
 export FRONTEND_URL='https://tma-frontend-gray.vercel.app'

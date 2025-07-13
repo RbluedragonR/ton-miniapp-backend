@@ -19,6 +19,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const swapRoutes = require('./routes/swapRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // --- Initialization ---
 const app = express();
@@ -56,7 +57,7 @@ app.use(rateLimit({
 }));
 
 // --- API Routes ---
-app.get('/', (req, res) => res.json({ message: 'ARIX Terminal Backend is running!' }));
+app.get('/', (req, res) => res.json({ message: 'OXYBLE Terminal Backend is running!' }));
 app.get('/health', (req, res) => res.status(200).json({ status: 'healthy' }));
 
 app.use('/api/user', userRoutes); // Changed to singular 'user'
@@ -66,6 +67,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/swap', swapRoutes);
+app.use('/api/auth', authRoutes);
 
 // --- Telegram Webhook Route ---
 app.post(`/telegram-webhook-${process.env.TELEGRAM_BOT_TOKEN}`, (req, res) => {

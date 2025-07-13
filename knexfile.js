@@ -25,6 +25,6 @@ module.exports = {
     tableName: 'knex_migrations',
     // You can point this to a migrations directory if you start using Knex migrations.
     // For now, it's just needed for the connection to work.
-    directory: './db/migrations' 
+    directory: './migrations' 
   },
 };

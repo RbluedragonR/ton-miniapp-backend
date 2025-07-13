@@ -3,14 +3,14 @@
  *
  * This file contains utility functions for interacting with the TON blockchain.
  * REVISIONS:
- * - Added `sendArixJettons` function to handle on-chain ARIX withdrawals from the hot wallet.
+ * - Added `sendOXYBLEJettons` function to handle on-chain OXYBLE withdrawals from the hot wallet.
  * - This new function is built upon your existing helpers for consistency.
  * - It constructs and sends a jetton transfer transaction.
  */
 const { TonClient, Address, Cell, toNano, fromNano, internal, WalletContractV4, KeyPair, mnemonicToPrivateKey } = require("@ton/ton");
 const { getHttpEndpoint } = require("@orbs-network/ton-access");
 const { TON_NETWORK, TON_ACCESS_API_KEY, HOT_WALLET_MNEMONIC } = require('../config/envConfig');
-const { USDT_DECIMALS, ARIX_DECIMALS, ARIX_TOKEN_MASTER_ADDRESS } = require('./constants');
+const { USDT_DECIMALS, OXYBLE_DECIMALS, OXYBLE_TOKEN_MASTER_ADDRESS } = require('./constants');
 
 let memoizedTonClient = null;
 
@@ -137,19 +137,19 @@ async function waitForTransaction(client, walletAddress, seqno, timeoutMs = 1200
 }
 
 /**
- * [NEW] Sends ARIX jettons from the hot wallet.
+ * [NEW] Sends OXYBLE jettons from the hot wallet.
  * @param {string} toAddressString - The recipient's main wallet address.
- * @param {number|string} amount - The amount of ARIX to send (in human-readable format, e.g., 100.5).
+ * @param {number|string} amount - The amount of OXYBLE to send (in human-readable format, e.g., 100.5).
  * @param {string} memo - A text comment for the transaction.
  * @returns {Promise<{success: boolean, seqno: number}>}
  */
-async function sendArixJettons(toAddressString, amount, memo) {
+async function sendOXYBLEJettons(toAddressString, amount, memo) {
     const client = await getTonClient();
     const hotWallet = await getWalletForPayout();
 
-    const hotWalletJettonAddress = await getJettonWalletAddress(hotWallet.address.toString(), ARIX_TOKEN_MASTER_ADDRESS);
+    const hotWalletJettonAddress = await getJettonWalletAddress(hotWallet.address.toString(), OXYBLE_TOKEN_MASTER_ADDRESS);
     if (!hotWalletJettonAddress) {
-        throw new Error("Could not derive the hot wallet's ARIX jetton address.");
+        throw new Error("Could not derive the hot wallet's OXYBLE jetton address.");
     }
     
     // Create the message body for the jetton transfer
@@ -195,5 +195,5 @@ module.exports = {
     createJettonForwardPayload,
     getWalletForPayout,
     waitForTransaction,
-    sendArixJettons, // <-- Export the new function
+    sendOXYBLEJettons, // <-- Export the new function
 };

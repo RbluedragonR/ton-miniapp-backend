@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}--- ARIX Terminal Railway.app Automated Deployment ---${NC}"
+echo -e "${BLUE}--- OXYBLE Terminal Railway.app Automated Deployment ---${NC}"
 echo -e "${YELLOW}This script will fully automate your Node.js backend deployment with PostgreSQL.${NC}"
 
 # Step 1: Check dependencies

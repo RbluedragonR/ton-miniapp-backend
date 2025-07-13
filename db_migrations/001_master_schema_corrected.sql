@@ -1,5 +1,5 @@
 -- =============================================================================
--- ARIX TERMINAL - MASTER DATABASE SCHEMA (CORRECTED & COMPLETE)
+-- OXYBLE TERMINAL - MASTER DATABASE SCHEMA (CORRECTED & COMPLETE)
 -- Version 1.3 - Integrated performance fixes for Crash Game
 --
 -- This script creates the entire database schema from scratch and is fully
@@ -13,7 +13,7 @@ DROP TABLE IF EXISTS
     public.announcements,
     public.referral_rewards,
     public.user_usdt_withdrawals,
-    public.user_arix_withdrawals,
+    public.user_OXYBLE_withdrawals,
     public.user_task_completions,
     public.tasks,
     public.coinflip_history,
@@ -69,9 +69,9 @@ CREATE TABLE public.users (
     referral_code VARCHAR(10) UNIQUE,
     referrer_wallet_address VARCHAR(68) REFERENCES public.users(wallet_address) ON DELETE SET NULL,
     claimable_usdt_balance NUMERIC(20, 6) NOT NULL DEFAULT 0.00,
-    claimable_arix_rewards NUMERIC(20, 9) NOT NULL DEFAULT 0.00,
+    claimable_OXYBLE_rewards NUMERIC(20, 9) NOT NULL DEFAULT 0.00,
     -- Internal balances for swap/games feature
-    balance NUMERIC(20, 9) NOT NULL DEFAULT 0.00, -- Represents ARIX balance
+    balance NUMERIC(20, 9) NOT NULL DEFAULT 0.00, -- Represents OXYBLE balance
     usdt_balance NUMERIC(20, 6) NOT NULL DEFAULT 0.00,
     ton_balance NUMERIC(20, 9) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -94,7 +94,7 @@ CREATE TABLE public.staking_plans (
     title VARCHAR(100) NOT NULL,
     duration_days INTEGER NOT NULL,
     fixed_usdt_apr_percent NUMERIC(5, 2) NOT NULL,
-    arix_early_unstake_penalty_percent NUMERIC(5, 2) NOT NULL,
+    OXYBLE_early_unstake_penalty_percent NUMERIC(5, 2) NOT NULL,
     min_stake_usdt NUMERIC(10, 2) DEFAULT 0,
     max_stake_usdt NUMERIC(10, 2),
     referral_l1_invest_percent NUMERIC(5, 2) DEFAULT 0,
@@ -108,11 +108,11 @@ CREATE TABLE public.user_stakes (
     stake_id UUID PRIMARY KEY,
     user_wallet_address VARCHAR(68) NOT NULL REFERENCES public.users(wallet_address),
     staking_plan_id INTEGER NOT NULL REFERENCES public.staking_plans(plan_id),
-    arix_amount_staked NUMERIC(20, 9) NOT NULL,
+    OXYBLE_amount_staked NUMERIC(20, 9) NOT NULL,
     reference_usdt_value_at_stake_time NUMERIC(20, 6) NOT NULL,
     usdt_reward_accrued_total NUMERIC(20, 6) DEFAULT 0,
-    arix_penalty_applied NUMERIC(20, 9) DEFAULT 0,
-    arix_final_reward_calculated NUMERIC(20, 9) DEFAULT 0,
+    OXYBLE_penalty_applied NUMERIC(20, 9) DEFAULT 0,
+    OXYBLE_final_reward_calculated NUMERIC(20, 9) DEFAULT 0,
     status VARCHAR(30) NOT NULL DEFAULT 'pending_confirmation',
     stake_timestamp TIMESTAMPTZ NOT NULL,
     unlock_timestamp TIMESTAMPTZ NOT NULL,
@@ -148,11 +148,11 @@ CREATE INDEX IF NOT EXISTS idx_referral_rewards_referrer ON public.referral_rewa
 CREATE TABLE public.coinflip_history (
     game_id SERIAL PRIMARY KEY,
     user_wallet_address VARCHAR(68) NOT NULL REFERENCES public.users(wallet_address),
-    bet_amount_arix NUMERIC(20, 9),
+    bet_amount_OXYBLE NUMERIC(20, 9),
     choice VARCHAR(10),
     server_coin_side VARCHAR(10),
     outcome VARCHAR(10),
-    amount_delta_arix NUMERIC(20, 9),
+    amount_delta_OXYBLE NUMERIC(20, 9),
     played_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_coinflip_history_wallet_address ON public.coinflip_history(user_wallet_address);
@@ -175,10 +175,10 @@ CREATE TABLE public.crash_bets (
     id SERIAL PRIMARY KEY,
     game_id INTEGER REFERENCES public.crash_rounds(id) ON DELETE CASCADE,
     user_wallet_address VARCHAR(68) NOT NULL REFERENCES public.users(wallet_address),
-    bet_amount_arix NUMERIC(20, 9),
+    bet_amount_OXYBLE NUMERIC(20, 9),
     status VARCHAR(20),
     cash_out_multiplier NUMERIC(10, 2),
-    payout_arix NUMERIC(20, 9),
+    payout_OXYBLE NUMERIC(20, 9),
     placed_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_crash_bets_wallet_address ON public.crash_bets(user_wallet_address);
@@ -206,7 +206,7 @@ CREATE TABLE public.tasks (
     task_key VARCHAR(50) UNIQUE NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    reward_arix_amount NUMERIC(20, 9) DEFAULT 0,
+    reward_OXYBLE_amount NUMERIC(20, 9) DEFAULT 0,
     task_type VARCHAR(50) DEFAULT 'social',
     validation_type VARCHAR(50) DEFAULT 'manual',
     action_url TEXT,
@@ -233,10 +233,10 @@ CREATE INDEX IF NOT EXISTS idx_user_task_completions_user_task ON public.user_ta
 
 
 -- Tables for Withdrawals (REQUIRED by earnService)
-CREATE TABLE public.user_arix_withdrawals (
+CREATE TABLE public.user_OXYBLE_withdrawals (
     withdrawal_id SERIAL PRIMARY KEY,
     user_wallet_address VARCHAR(68) NOT NULL REFERENCES public.users(wallet_address),
-    amount_arix NUMERIC(20, 9) NOT NULL,
+    amount_OXYBLE NUMERIC(20, 9) NOT NULL,
     status VARCHAR(20) DEFAULT 'pending_payout' NOT NULL,
     onchain_tx_hash VARCHAR(64) UNIQUE,
     requested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

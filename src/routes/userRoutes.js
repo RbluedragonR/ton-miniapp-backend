@@ -16,7 +16,7 @@ router.get('/profile/:userWalletAddress', userController.getUserProfile);
 
 router.get('/profile/:userWalletAddress', userController.getUserProfile);
 
-// [NEW] POST /api/user/withdraw/arix - Initiate an ARIX withdrawal
-router.post('/withdraw/arix', userController.handleArixWithdrawal);
+// [NEW] POST /api/user/withdraw/OXYBLE - Initiate an OXYBLE withdrawal
+router.post('/withdraw/OXYBLE', userController.handleOXYBLEWithdrawal);
 
 module.exports = router;

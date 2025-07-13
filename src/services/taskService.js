@@ -1,6 +1,6 @@
 
 const db = require('../config/database');
-const ARIX_DECIMALS = 9; 
+const OXYBLE_DECIMALS = 9; 
 
 class TaskService {
     async fetchActiveTasks(userWalletAddress = null) {
@@ -8,7 +8,7 @@ class TaskService {
         
         let tasksQuery = `
             SELECT 
-                t.task_id, t.task_key, t.title, t.description, t.reward_arix_amount, 
+                t.task_id, t.task_key, t.title, t.description, t.reward_OXYBLE_amount, 
                 t.task_type, t.validation_type, t.action_url, t.is_repeatable, t.max_completions_user
             FROM tasks t
             WHERE t.is_active = TRUE 
@@ -21,7 +21,7 @@ class TaskService {
         if (!userWalletAddress) {
             return tasks.map(t => ({
                 ...t,
-                reward_arix_amount: parseFloat(t.reward_arix_amount).toFixed(ARIX_DECIMALS)
+                reward_OXYBLE_amount: parseFloat(t.reward_OXYBLE_amount).toFixed(OXYBLE_DECIMALS)
             }));
         }
 
@@ -67,7 +67,7 @@ class TaskService {
             
             return {
                 ...task,
-                reward_arix_amount: parseFloat(task.reward_arix_amount).toFixed(ARIX_DECIMALS),
+                reward_OXYBLE_amount: parseFloat(task.reward_OXYBLE_amount).toFixed(OXYBLE_DECIMALS),
                 user_status: userStatus,
                 can_attempt: canAttempt
             };
@@ -124,14 +124,14 @@ class TaskService {
             let rewardCredited = false;
 
             
-            if (newCompletion.status === 'approved' && parseFloat(task.reward_arix_amount) > 0) {
-                const rewardAmount = parseFloat(task.reward_arix_amount);
+            if (newCompletion.status === 'approved' && parseFloat(task.reward_OXYBLE_amount) > 0) {
+                const rewardAmount = parseFloat(task.reward_OXYBLE_amount);
                 
                 await client.query("INSERT INTO users (wallet_address) VALUES ($1) ON CONFLICT (wallet_address) DO NOTHING", [userWalletAddress]);
                 
                 
                 await client.query(
-                    `UPDATE users SET claimable_arix_rewards = COALESCE(claimable_arix_rewards, 0) + $1, updated_at = NOW() 
+                    `UPDATE users SET claimable_OXYBLE_rewards = COALESCE(claimable_OXYBLE_rewards, 0) + $1, updated_at = NOW() 
                      WHERE wallet_address = $2`,
                     [rewardAmount, userWalletAddress]
                 );
@@ -141,7 +141,7 @@ class TaskService {
                      WHERE completion_id = $1`,
                     [newCompletion.completion_id]
                 );
-                message = `Task '${task.title}' approved! ${rewardAmount.toFixed(ARIX_DECIMALS)} ARIX credited to your rewards balance.`;
+                message = `Task '${task.title}' approved! ${rewardAmount.toFixed(OXYBLE_DECIMALS)} OXYBLE credited to your rewards balance.`;
                 rewardCredited = true;
             }
             
@@ -151,11 +151,11 @@ class TaskService {
             
             if (task.task_key === 'FIRST_STAKE_TASK' && task.validation_type === 'auto_approve_on_stake') {
                  
-                 if (parseFloat(task.reward_arix_amount) > 0 && !rewardCredited) {
-                    const rewardAmount = parseFloat(task.reward_arix_amount);
-                    await client.query(`UPDATE users SET claimable_arix_rewards = COALESCE(claimable_arix_rewards, 0) + $1, updated_at = NOW() WHERE wallet_address = $2`, [rewardAmount, userWalletAddress]);
+                 if (parseFloat(task.reward_OXYBLE_amount) > 0 && !rewardCredited) {
+                    const rewardAmount = parseFloat(task.reward_OXYBLE_amount);
+                    await client.query(`UPDATE users SET claimable_OXYBLE_rewards = COALESCE(claimable_OXYBLE_rewards, 0) + $1, updated_at = NOW() WHERE wallet_address = $2`, [rewardAmount, userWalletAddress]);
                     await client.query(`UPDATE user_task_completions SET status = 'reward_credited', reward_credited_at = NOW(), verified_at = NOW() WHERE completion_id = $1`, [newCompletion.completion_id]);
-                    message = `Task '${task.title}' recorded! ${rewardAmount.toFixed(ARIX_DECIMALS)} ARIX credited.`;
+                    message = `Task '${task.title}' recorded! ${rewardAmount.toFixed(OXYBLE_DECIMALS)} OXYBLE credited.`;
                     rewardCredited = true;
                  } else if (!rewardCredited) {
                     await client.query(`UPDATE user_task_completions SET status = 'approved', verified_at = NOW() WHERE completion_id = $1`, [newCompletion.completion_id]);
@@ -184,7 +184,7 @@ class TaskService {
         const query = `
             SELECT 
                 utc.completion_id, utc.status, utc.submission_data, utc.completed_at, utc.verified_at, utc.reward_credited_at, utc.notes,
-                t.task_id, t.task_key, t.title, t.description, t.reward_arix_amount, t.task_type, t.action_url
+                t.task_id, t.task_key, t.title, t.description, t.reward_OXYBLE_amount, t.task_type, t.action_url
             FROM user_task_completions utc
             JOIN tasks t ON utc.task_id = t.task_id
             WHERE utc.user_wallet_address = $1
@@ -193,7 +193,7 @@ class TaskService {
         const { rows } = await db.query(query, [userWalletAddress]);
         return rows.map(row => ({
             ...row,
-            reward_arix_amount: parseFloat(row.reward_arix_amount).toFixed(ARIX_DECIMALS)
+            reward_OXYBLE_amount: parseFloat(row.reward_OXYBLE_amount).toFixed(OXYBLE_DECIMALS)
         }));
     }
 }

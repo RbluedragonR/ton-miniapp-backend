@@ -3,16 +3,16 @@ const pool = require('../config/database');
 const userService = require('./userService');
 
 // In a real app, this would come from a price feed API.
-const ARIX_TO_USDT_RATE = 1.5;
-const ARIX_TO_TON_RATE = 0.25;
+const OXYBLE_TO_USDT_RATE = 1.5;
+const OXYBLE_TO_TON_RATE = 0.25;
 const USDT_TO_TON_RATE = 0.15;
 
 class SwapService {
     getSwapRate(from, to) {
-        if (from === 'ARIX' && to === 'USDT') return ARIX_TO_USDT_RATE;
-        if (from === 'USDT' && to === 'ARIX') return 1 / ARIX_TO_USDT_RATE;
-        if (from === 'ARIX' && to === 'TON') return ARIX_TO_TON_RATE;
-        if (from === 'TON' && to === 'ARIX') return 1 / ARIX_TO_TON_RATE;
+        if (from === 'OXYBLE' && to === 'USDT') return OXYBLE_TO_USDT_RATE;
+        if (from === 'USDT' && to === 'OXYBLE') return 1 / OXYBLE_TO_USDT_RATE;
+        if (from === 'OXYBLE' && to === 'TON') return OXYBLE_TO_TON_RATE;
+        if (from === 'TON' && to === 'OXYBLE') return 1 / OXYBLE_TO_TON_RATE;
         if (from === 'USDT' && to === 'TON') return USDT_TO_TON_RATE;
         if (from === 'TON' && to === 'USDT') return 1 / USDT_TO_TON_RATE;
         return null;

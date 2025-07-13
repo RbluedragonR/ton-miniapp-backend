@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const swapController = require('../controllers/swapController');
 
-// GET /api/swap/quote?from=ARIX&to=USDT
+// GET /api/swap/quote?from=OXYBLE&to=USDT
 router.get('/quote', swapController.getQuote);
 
 // POST /api/swap/execute

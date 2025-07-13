@@ -42,9 +42,9 @@ ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_telegram
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_referral_code_key;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_usdt_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_pkey1;
-ALTER TABLE IF EXISTS ONLY public.user_arix_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_pkey;
+ALTER TABLE IF EXISTS ONLY public.user_OXYBLE_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_usdt_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_onchain_tx_hash_key1;
-ALTER TABLE IF EXISTS ONLY public.user_arix_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_onchain_tx_hash_key;
+ALTER TABLE IF EXISTS ONLY public.user_OXYBLE_withdrawals DROP CONSTRAINT IF EXISTS user_usdt_withdrawals_onchain_tx_hash_key;
 ALTER TABLE IF EXISTS ONLY public.user_task_completions DROP CONSTRAINT IF EXISTS user_task_completions_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_stakes DROP CONSTRAINT IF EXISTS user_stakes_pkey;
 ALTER TABLE IF EXISTS ONLY public.user_stakes DROP CONSTRAINT IF EXISTS user_stakes_onchain_unstake_tx_hash_key;
@@ -60,7 +60,7 @@ ALTER TABLE IF EXISTS ONLY public.announcements DROP CONSTRAINT IF EXISTS announ
 ALTER TABLE IF EXISTS ONLY neon_auth.users_sync DROP CONSTRAINT IF EXISTS users_sync_pkey;
 ALTER TABLE IF EXISTS public.user_usdt_withdrawals ALTER COLUMN withdrawal_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.user_task_completions ALTER COLUMN completion_id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.user_arix_withdrawals ALTER COLUMN withdrawal_id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.user_OXYBLE_withdrawals ALTER COLUMN withdrawal_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.tasks ALTER COLUMN task_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.staking_plans ALTER COLUMN plan_id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.referral_rewards ALTER COLUMN reward_id DROP DEFAULT;
@@ -74,7 +74,7 @@ DROP TABLE IF EXISTS public.user_usdt_withdrawals;
 DROP SEQUENCE IF EXISTS public.user_task_completions_completion_id_seq;
 DROP TABLE IF EXISTS public.user_task_completions;
 DROP TABLE IF EXISTS public.user_stakes;
-DROP TABLE IF EXISTS public.user_arix_withdrawals;
+DROP TABLE IF EXISTS public.user_OXYBLE_withdrawals;
 DROP SEQUENCE IF EXISTS public.tasks_task_id_seq;
 DROP TABLE IF EXISTS public.tasks;
 DROP SEQUENCE IF EXISTS public.staking_plans_plan_id_seq;
@@ -202,11 +202,11 @@ ALTER SEQUENCE public.announcements_announcement_id_seq OWNED BY public.announce
 CREATE TABLE public.coinflip_history (
     game_id integer NOT NULL,
     user_wallet_address character varying(68) NOT NULL,
-    bet_amount_arix numeric(20,9) NOT NULL,
+    bet_amount_OXYBLE numeric(20,9) NOT NULL,
     choice character varying(10) NOT NULL,
     server_coin_side character varying(10) NOT NULL,
     outcome character varying(10) NOT NULL,
-    amount_delta_arix numeric(20,9) NOT NULL,
+    amount_delta_OXYBLE numeric(20,9) NOT NULL,
     played_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -313,7 +313,7 @@ CREATE TABLE public.staking_plans (
     title character varying(100) NOT NULL,
     duration_days integer NOT NULL,
     fixed_usdt_apr_percent numeric(5,2) NOT NULL,
-    arix_early_unstake_penalty_percent numeric(5,2) NOT NULL,
+    OXYBLE_early_unstake_penalty_percent numeric(5,2) NOT NULL,
     min_stake_usdt numeric(10,2) DEFAULT 0,
     max_stake_usdt numeric(10,2),
     referral_l1_invest_percent numeric(5,2) DEFAULT 0,
@@ -353,7 +353,7 @@ CREATE TABLE public.tasks (
     task_key character varying(50) NOT NULL,
     title character varying(255) NOT NULL,
     description text,
-    reward_arix_amount numeric(20,9) DEFAULT 0,
+    reward_OXYBLE_amount numeric(20,9) DEFAULT 0,
     task_type character varying(50) DEFAULT 'social'::character varying,
     validation_type character varying(50) DEFAULT 'manual'::character varying,
     action_url text,
@@ -387,13 +387,13 @@ ALTER SEQUENCE public.tasks_task_id_seq OWNED BY public.tasks.task_id;
 
 
 --
--- Name: user_arix_withdrawals; Type: TABLE; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.user_arix_withdrawals (
+CREATE TABLE public.user_OXYBLE_withdrawals (
     withdrawal_id integer NOT NULL,
     user_wallet_address character varying(68) NOT NULL,
-    amount_arix numeric(20,9) NOT NULL,
+    amount_OXYBLE numeric(20,9) NOT NULL,
     status character varying(20) DEFAULT 'pending_payout'::character varying NOT NULL,
     onchain_tx_hash character varying(64),
     requested_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
@@ -409,7 +409,7 @@ CREATE TABLE public.user_stakes (
     stake_id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_wallet_address character varying(68) NOT NULL,
     staking_plan_id integer NOT NULL,
-    arix_amount_staked numeric(20,9) NOT NULL,
+    OXYBLE_amount_staked numeric(20,9) NOT NULL,
     reference_usdt_value_at_stake_time numeric(20,6) NOT NULL,
     stake_timestamp timestamp with time zone NOT NULL,
     unlock_timestamp timestamp with time zone NOT NULL,
@@ -418,8 +418,8 @@ CREATE TABLE public.user_stakes (
     status character varying(30) DEFAULT 'pending_confirmation'::character varying NOT NULL,
     usdt_reward_accrued_total numeric(20,6) DEFAULT 0.00,
     last_usdt_reward_calc_timestamp timestamp with time zone,
-    arix_penalty_applied numeric(20,9) DEFAULT 0,
-    arix_final_reward_calculated numeric(20,9) DEFAULT 0,
+    OXYBLE_penalty_applied numeric(20,9) DEFAULT 0,
+    OXYBLE_final_reward_calculated numeric(20,9) DEFAULT 0,
     onchain_unstake_tx_boc text,
     onchain_unstake_tx_hash character varying(64),
     notes text,
@@ -498,7 +498,7 @@ CREATE SEQUENCE public.user_usdt_withdrawals_withdrawal_id_seq
 -- Name: user_usdt_withdrawals_withdrawal_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.user_usdt_withdrawals_withdrawal_id_seq OWNED BY public.user_arix_withdrawals.withdrawal_id;
+ALTER SEQUENCE public.user_usdt_withdrawals_withdrawal_id_seq OWNED BY public.user_OXYBLE_withdrawals.withdrawal_id;
 
 
 --
@@ -534,7 +534,7 @@ CREATE TABLE public.users (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     claimable_usdt_balance numeric(20,6) DEFAULT 0.00 NOT NULL,
-    claimable_arix_rewards numeric(20,9) DEFAULT 0.00 NOT NULL
+    claimable_OXYBLE_rewards numeric(20,9) DEFAULT 0.00 NOT NULL
 );
 
 
@@ -581,10 +581,10 @@ ALTER TABLE ONLY public.tasks ALTER COLUMN task_id SET DEFAULT nextval('public.t
 
 
 --
--- Name: user_arix_withdrawals withdrawal_id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals withdrawal_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_arix_withdrawals ALTER COLUMN withdrawal_id SET DEFAULT nextval('public.user_usdt_withdrawals_withdrawal_id_seq'::regclass);
+ALTER TABLE ONLY public.user_OXYBLE_withdrawals ALTER COLUMN withdrawal_id SET DEFAULT nextval('public.user_usdt_withdrawals_withdrawal_id_seq'::regclass);
 
 
 --
@@ -706,10 +706,10 @@ ALTER TABLE ONLY public.user_task_completions
 
 
 --
--- Name: user_arix_withdrawals user_usdt_withdrawals_onchain_tx_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals user_usdt_withdrawals_onchain_tx_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_arix_withdrawals
+ALTER TABLE ONLY public.user_OXYBLE_withdrawals
     ADD CONSTRAINT user_usdt_withdrawals_onchain_tx_hash_key UNIQUE (onchain_tx_hash);
 
 
@@ -722,10 +722,10 @@ ALTER TABLE ONLY public.user_usdt_withdrawals
 
 
 --
--- Name: user_arix_withdrawals user_usdt_withdrawals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: user_OXYBLE_withdrawals user_usdt_withdrawals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_arix_withdrawals
+ALTER TABLE ONLY public.user_OXYBLE_withdrawals
     ADD CONSTRAINT user_usdt_withdrawals_pkey PRIMARY KEY (withdrawal_id);
 
 
@@ -828,14 +828,14 @@ CREATE INDEX idx_user_task_completions_user_task ON public.user_task_completions
 -- Name: idx_user_usdt_withdrawals_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_user_usdt_withdrawals_status ON public.user_arix_withdrawals USING btree (status);
+CREATE INDEX idx_user_usdt_withdrawals_status ON public.user_OXYBLE_withdrawals USING btree (status);
 
 
 --
 -- Name: idx_user_usdt_withdrawals_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_user_usdt_withdrawals_user ON public.user_arix_withdrawals USING btree (user_wallet_address);
+CREATE INDEX idx_user_usdt_withdrawals_user ON public.user_OXYBLE_withdrawals USING btree (user_wallet_address);
 
 
 --

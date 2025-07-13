@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ===================================================================================
-# ARIX TERMINAL - RAILWAY DEPLOYMENT SCRIPT (v22 - FINAL)
+# OXYBLE TERMINAL - RAILWAY DEPLOYMENT SCRIPT (v22 - FINAL)
 # ===================================================================================
 # This script contains all necessary fixes for deployment. It deletes the Dockerfile,
 # creates a correct nixpacks.toml, and uses the correct 'redeploy' command.

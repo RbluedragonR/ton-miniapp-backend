@@ -1,7 +1,7 @@
 # --- Export variables for the 'railway up' command ---
 export DATABASE_URL='postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway'
 export POSTGRES_URL='postgresql://postgres:sqtTKgGjtyjNRQZerlBLLHyRtkwxyXHV@hopper.proxy.rlwy.net:17374/railway'
-export ARIX_TOKEN_MASTER_ADDRESS='EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd'
+export OXYBLE_TOKEN_MASTER_ADDRESS='EQCLU6KIPjZJbhyYlRfENc3nQck2DWulsUq2gJPyWEK9wfDd'
 export BACKEND_USDT_WALLET_ADDRESS='UQC7X42jH4O87Jpeo7kseX5HEXwEXKEm2S-FifEsjV2hgGpQ'
 export BACKEND_USDT_WALLET_MNEMONIC='soldier wife alpha airport between train enhance bench citizen rubber arrange gospel bright chase gesture lecture river affair denial coast ill miracle jacket genre'
 export FRONTEND_URL='https://tma-frontend-gray.vercel.app'

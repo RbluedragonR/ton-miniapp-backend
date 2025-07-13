@@ -3,7 +3,7 @@
  *
  * This file handles the request/response cycle for user-related endpoints.
  * REVISIONS:
- * - Added `handleArixWithdrawal` to process POST requests for withdrawals.
+ * - Added `handleOXYBLEWithdrawal` to process POST requests for withdrawals.
  * - It performs validation on the request body before calling the user service.
  * - Kept your existing `getUserProfile` and `isValidTonAddress` functions.
  */
@@ -64,9 +64,9 @@ exports.getUserProfile = async (req, res, next) => {
 
 
 /**
- * [NEW] Controller to handle ARIX withdrawal requests.
+ * [NEW] Controller to handle OXYBLE withdrawal requests.
  */
-exports.handleArixWithdrawal = async (req, res, next) => {
+exports.handleOXYBLEWithdrawal = async (req, res, next) => {
     const { userWalletAddress, amount, recipientAddress } = req.body;
 
     try {
@@ -80,10 +80,10 @@ exports.handleArixWithdrawal = async (req, res, next) => {
             return res.status(400).json({ error: "Invalid amount specified." });
         }
 
-        const result = await userService.processArixWithdrawal(userWalletAddress, parseFloat(amount), recipientAddress);
+        const result = await userService.processOXYBLEWithdrawal(userWalletAddress, parseFloat(amount), recipientAddress);
         res.status(200).json(result);
     } catch (error) {
-        console.error("CTRL: Error in handleArixWithdrawal:", error.message);
+        console.error("CTRL: Error in handleOXYBLEWithdrawal:", error.message);
         next(error); // Pass to the global error handler
     }
 };
@@ -92,11 +92,11 @@ exports.handleArixWithdrawal = async (req, res, next) => {
  * [NEW] Controller-like function to handle confirmed deposits from the listener.
  * This is not an endpoint, but a function to be called internally.
  */
-exports.handleArixDeposit = async (depositData) => {
+exports.handleOXYBLEDeposit = async (depositData) => {
     const { userWalletAddress, amount, txHash } = depositData;
     try {
         console.log(`Processing deposit for wallet: ${userWalletAddress} with amount: ${amount}`);
-        await userService.creditArixDeposit(userWalletAddress, amount, txHash);
+        await userService.creditOXYBLEDeposit(userWalletAddress, amount, txHash);
         console.log(`Successfully credited deposit for wallet: ${userWalletAddress}`);
     } catch (error) {
         console.error(`Failed to process deposit for wallet ${userWalletAddress}:`, error);
